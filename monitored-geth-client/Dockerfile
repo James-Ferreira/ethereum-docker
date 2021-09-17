@@ -1,4 +1,4 @@
-FROM ethereum/client-go
+FROM ethereum/client-go:v1.10.1
 
 # install required packages
 RUN apk add --update git bash nodejs npm perl &&\
