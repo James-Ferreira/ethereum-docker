@@ -28,5 +28,6 @@
       "comment": "bootnode node ip"
     }],
 
-  "hardforks": []
+    "hardforks": [
+    ]
 }

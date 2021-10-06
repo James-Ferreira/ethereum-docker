@@ -4,15 +4,21 @@ import LRUCache from 'lru-cache'
 import ms from 'ms'
 import chalk from 'chalk'
 import * as rlp from 'rlp'
-import Common from '@ethereumjs/common'
-import { Transaction } from '@ethereumjs/tx'
+import Common, { Hardfork } from '@ethereumjs/common'
+import { Transaction, AccessListEIP2930Transaction } from '@ethereumjs/tx'
 import { Block, BlockHeader } from '@ethereumjs/block'
 import * as devp2p from '../src/index'
 import { ETH, Peer } from '../src/index'
 
+
+
+import myCustomChain from './js-genesis.json'
+//import { AccessListEIP2930Transaction } from '@ethereumjs/tx'
+
+
 const PRIVATE_KEY = randomBytes(32)
 
-const common = new Common({ chain: 'mainnet' })
+const common = new Common({ chain: myCustomChain})
 const bootstrapNodes = common.bootstrapNodes()
 const BOOTNODES = bootstrapNodes.map((node: any) => {
   return {
@@ -348,6 +354,7 @@ function onNewBlock(block: Block, peer: Peer) {
   console.log(
     `----------------------------------------------------------------------------------------------------------`
   )
+
   for (const tx of block.transactions) onNewTx(tx, peer)
 }
 
