@@ -1,0 +1,32 @@
+{
+  "name": "ibis test bed",
+  "chainId": 413098575,
+  "networkId": 413098575,
+  "consensus": {
+    "type": "pow",
+    "algorithm": "ethash",
+    "ethash": {}
+  },
+  "comment": "The IBIS Docker Testbed",
+
+  "genesis": {
+    "hash": "0xe3543ec4a70a1794cbebb6895501022f7b30a96ab56c06a5ff668caab02a41db",
+    "timestamp": 0,
+    "gasLimit": 12000000,
+    "difficulty": 1,
+    "nonce": "0x0000000000000000",
+    "extraData": "0x",
+    "stateRoot": "0x85832e08f6193644cfebf6e91cdffa1a5b2fcfa20a78eeb3b6a938c771949716"
+  },
+
+  "bootstrapNodes": [
+    {
+      "ip": "172.16.254.2",
+      "port": 30303,
+      "id": "94b82260db33e63d1b7425f11152a50b91887591a2447b233105f392dbae72ce",
+      "location": "ap-southeast-1-001",
+      "comment": "bootnode node ip"
+    }],
+
+  "hardforks": []
+}

@@ -1,5 +1,15 @@
-version: '2'
+version: '3'
+
 services:
+
+  ethereumjs:
+    container_name: cont_ethereumjs
+    build: ethereumjs
+    volumes:
+    - ./files/ethereumjs-scripts:/usr/ibis/ethereumjs-monorepo/packages/devp2p/ethereumjs-scripts
+    networks:
+      priv-eth-net:
+
   bootstrap:
     container_name: bootstrap
     hostname: bootstrap
@@ -20,12 +30,13 @@ services:
     command: '
       --datadir=~/.ethereum/devchain 
       --nodekeyhex=091bd6067cb4612df85d9c1ff85cc47f259ced4d4cd99816b14f35650f59c322
-      --http.api "admin,debug,web3,eth,txpool,personal,ethash,miner,net"
-      --http.corsdomain="*"
       --networkid=413098575
       --http
+      --http.api "admin,debug,web3,eth,txpool,personal,ethash,miner,net"
+      --http.addr="0.0.0.0"
+      --http.corsdomain="*"
       --netrestrict="172.16.254.0/28"
-      --http.addr="0.0.0.0"'
+      '
     links:
       - netstats
     networks:
@@ -46,13 +57,14 @@ services:
       #- ./james-eth-test:/root/.ethereum/
     command: '
       --datadir=~/.ethereum/devchain
-      --mine
-      --miner.threads=1
-      --http.corsdomain="*"
+      --bootnodes="enode://288b97262895b1c7ec61cf314c2e2004407d0a5dc77566877aad1f2a36659c8b698f4b56fd06c4a0c0bf007b4cfb3e7122d907da3b005fa90e724441902eb19e@XXX:30303"
       --networkid=413098575
       --http
+      --http.api "admin,debug,web3,eth,txpool,personal,ethash,miner,net"
+      --http.addr="0.0.0.0"
+      --http.corsdomain="*"
       --netrestrict="172.16.254.0/28"
-      --bootnodes="enode://288b97262895b1c7ec61cf314c2e2004407d0a5dc77566877aad1f2a36659c8b698f4b56fd06c4a0c0bf007b4cfb3e7122d907da3b005fa90e724441902eb19e@XXX:30303"'
+      '
     networks:
         priv-eth-net:
   
