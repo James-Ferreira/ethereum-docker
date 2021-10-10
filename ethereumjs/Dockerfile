@@ -11,8 +11,6 @@ RUN git clone https://github.com/ethereumjs/ethereumjs-monorepo.git \
     && npm run build --workspaces
 
 RUN apt update \
-    && apt install vim
+    && apt install vim -y
 
 COPY /files /files
-
-CMD /bin/bash
