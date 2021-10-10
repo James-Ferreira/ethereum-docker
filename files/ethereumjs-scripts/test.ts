@@ -1,20 +1,18 @@
 import chalk from 'chalk'
+import { randomBytes } from 'crypto'
 import Common, { Chain } from '@ethereumjs/common'
 import { DPT } from '../src/index'
 import myCustomChain from './js-genesis.json'
 
 const PRIVATE_KEY = 'd772e3d6a001a38064dd23964dd2836239fa0e6cec8b28972a87460a17210fe9'
 
-
 const config = new Common({ chain: myCustomChain })
-const bootstrapNodes = config.bootstrapNodes()
-const BOOTNODES = bootstrapNodes.map((node: any) => {
-  return {
-    address: node.ip,
-    udpPort: node.port,
-    tcpPort: node.port,
-  }
-})
+
+const ibisBootnode = {
+  address: "172.16.254.14",
+  udpPort: 30303,
+  tcpPort: 30303,
+}
 
 const dpt = new DPT(Buffer.from(PRIVATE_KEY, 'hex'), {
   endpoint: {
@@ -38,12 +36,10 @@ dpt.on('peer:removed', (peer) => {
   )
 })
 
+
 // for accept incoming connections uncomment next line
 dpt.bind(30303, '0.0.0.0')
 
-// dpt.addPeer(bootstrap)
+dpt.addPeer(ibisBootnode)
 
-
-for (const bootnode of BOOTNODES) {
-  dpt.bootstrap(bootnode).catch((err) => console.error(chalk.bold.red(err.stack || err)))
-}
+console.log(dpt.getPeers())

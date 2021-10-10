@@ -17,7 +17,7 @@ services:
       --discV4=true
     '
     volumes:
-    - ./files/ethereumjs-scripts:/root/ethereumjs-scripts
+    - ./files/ethereumjs-scripts:/usr/ibis/ethereumjs-monorepo/packages/devp2p/examples
     - ./files/genesis.json:/root/genesis.json:ro
     networks:
       priv-eth-net:
@@ -50,6 +50,7 @@ services:
       --http.corsdomain="*"
       --netrestrict="172.16.254.0/28"
       --nat extip:172.16.254.14
+      --verbosity 4
       '
     links:
       - netstats
@@ -79,7 +80,7 @@ services:
       --http.api "admin,debug,web3,eth,txpool,personal,ethash,miner,net"
       --http.corsdomain="*"
       --netrestrict="172.16.254.0/28"
-      --verbosity 4
+      --verbosity 2
       '
     networks:
       priv-eth-net:
