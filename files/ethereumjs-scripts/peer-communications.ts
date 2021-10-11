@@ -123,22 +123,6 @@ dpt.addPeer(ibisBootnode).catch((err) => {
   console.error(chalk.bold.red(`DPT bootstrap error: ${err.stack || err}`))
 })
 
-
-
-// connect to local ethereum node (debug)
-/*
-dpt.addPeer({ address: '127.0.0.1', udpPort: 30303, tcpPort: 30303 })
-  .then((peer) => {
-    return rlpx.connect({
-      id: peer.id,
-      address: peer.address,
-      tcpPort: peer.tcpPort,
-      udpPort: peer.tcpPort
-    })
-  })
-  .catch((err) => console.log(`error on connection to local node: ${err.stack || err}`))
-*/
-
 const txCache = new LRUCache({ max: 1000 })
 function onNewTx(tx: TypedTransaction, peer: Peer) {
   const txHashHex = tx.hash().toString('hex')

@@ -2,6 +2,63 @@ version: '3'
 
 services:
 
+  bootstrap:
+    container_name: bootstrap
+    hostname: bootstrap
+    restart: on-failure
+    build: monitored-geth-client
+    env_file:
+      - .env
+    volumes:
+      - ./files/password:/root/files/password:ro
+      - ./files/genesis.json:/root/files/genesis.json:ro
+      - ./files/keystore:/root/.ethereum/devchain/keystore:rw
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "8545:8545"
+    entrypoint: /root/start.sh
+    command: '
+      --datadir=~/.ethereum/devchain 
+      --nodekeyhex=091bd6067cb4612df85d9c1ff85cc47f259ced4d4cd99816b14f35650f59c322
+      --networkid=413098575
+      --http
+      --http.api "admin,debug,web3,eth,txpool,personal,ethash,miner,net"
+      --http.corsdomain="*"
+      --netrestrict="172.16.254.0/28"
+      --nat extip:172.16.254.14
+      --verbosity 3
+      '
+    links:
+      - netstats
+    networks:
+      priv-eth-net:
+        ipv4_address: 172.16.254.14
+
+  eth:
+    build: monitored-geth-client
+    restart: on-failure
+    links:
+      - bootstrap
+      - netstats
+    entrypoint: /root/start.sh
+    volumes:
+      - ./files/password:/root/files/password:ro
+      - ./files/genesis.json:/root/files/genesis.json:ro
+      - ./files/keystore:/root/.ethereum/devchain/keystore:rw
+      - /etc/localtime:/etc/localtime:ro
+    command: '
+      --datadir=~/.ethereum/devchain
+      --bootnodes="enode://288b97262895b1c7ec61cf314c2e2004407d0a5dc77566877aad1f2a36659c8b698f4b56fd06c4a0c0bf007b4cfb3e7122d907da3b005fa90e724441902eb19e@172.16.254.14:30303"
+      --networkid=413098575
+      --http
+      --http.api "admin,debug,web3,eth,txpool,personal,ethash,miner,net"
+      --http.corsdomain="*"
+      --netrestrict="172.16.254.0/28"
+      --verbosity 2
+      '
+    networks:
+      priv-eth-net:
+  
   ethereumjs:
     container_name: cont_ethereumjs
     build: ethereumjs
@@ -22,69 +79,6 @@ services:
     networks:
       priv-eth-net:
 
-
-  bootstrap:
-    container_name: bootstrap
-    hostname: bootstrap
-    restart: on-failure
-    build: monitored-geth-client
-    env_file:
-      - .env
-    volumes:
-      - ./files/password:/root/files/password:ro
-      - ./files/genesis.json:/root/files/genesis.json:ro
-      - ./files/keystore:/root/.ethereum/devchain/keystore:rw
-      - /etc/localtime:/etc/localtime:ro
-    ports:
-      - "30303:30303"
-      - "30303:30303/udp"
-      - "8545:8545"
-    entrypoint: /root/start.sh
-    command: '
-      --datadir=~/.ethereum/devchain 
-      --nodekeyhex=091bd6067cb4612df85d9c1ff85cc47f259ced4d4cd99816b14f35650f59c322
-      --networkid=413098575
-      --http
-      --http.addr="0.0.0.0"
-      --http.api "admin,debug,web3,eth,txpool,personal,ethash,miner,net"
-      --http.corsdomain="*"
-      --netrestrict="172.16.254.0/28"
-      --nat extip:172.16.254.14
-      --verbosity 4
-      '
-    links:
-      - netstats
-    networks:
-      priv-eth-net:
-        ipv4_address: 172.16.254.14
-
-  eth:
-    build: monitored-geth-client
-    restart: on-failure
-    links:
-      - bootstrap
-      - netstats
-    entrypoint: /root/start.sh
-    volumes:
-      - ./files/password:/root/files/password:ro
-      - ./files/genesis.json:/root/files/genesis.json:ro
-      - ./files/keystore:/root/.ethereum/devchain/keystore:rw
-      - /etc/localtime:/etc/localtime:ro
-      #- ./james-eth-test:/root/.ethereum/
-    command: '
-      --datadir=~/.ethereum/devchain
-      --bootnodes="enode://288b97262895b1c7ec61cf314c2e2004407d0a5dc77566877aad1f2a36659c8b698f4b56fd06c4a0c0bf007b4cfb3e7122d907da3b005fa90e724441902eb19e@172.16.254.14:30303"
-      --networkid=413098575
-      --http
-      --http.addr="0.0.0.0"
-      --http.api "admin,debug,web3,eth,txpool,personal,ethash,miner,net"
-      --http.corsdomain="*"
-      --netrestrict="172.16.254.0/28"
-      --verbosity 2
-      '
-    networks:
-      priv-eth-net:
-  
   netstats:
     build: eth-netstats
     restart: on-failure
@@ -97,13 +91,15 @@ services:
       - "3000:3000"
     networks:
       priv-eth-net:
-
-
+      pub-eth-net:
 
 
 networks:
   priv-eth-net:
     driver: bridge
+    internal: true
     ipam:
       config:
       - subnet: 172.16.254.0/28
+  pub-eth-net:
+    driver: bridge
