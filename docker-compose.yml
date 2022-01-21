@@ -10,9 +10,9 @@ services:
     env_file:
       - .env
     volumes:
-      - ./files/password:/root/files/password:ro
-      - ./files/genesis.json:/root/files/genesis.json:ro
-      - ./files/keystore:/root/.ethereum/devchain/keystore:rw
+      - ./config/password:/root/files/password:ro
+      - ./config/genesis.json:/root/files/genesis.json:ro
+      - ./config/keystore:/root/.ethereum/devchain/keystore:rw
       - /etc/localtime:/etc/localtime:ro
     ports:
       - "8545:8545"
@@ -22,17 +22,18 @@ services:
       --nodekeyhex=091bd6067cb4612df85d9c1ff85cc47f259ced4d4cd99816b14f35650f59c322
       --networkid=413098575
       --http
+      --http.addr="172.16.254.62"
       --http.api "admin,debug,web3,eth,txpool,personal,ethash,miner,net"
       --http.corsdomain="*"
-      --netrestrict="172.16.254.0/28"
-      --nat extip:172.16.254.14
+      --netrestrict="172.16.254.62/26"
+      --nat extip:172.16.254.62
       --verbosity 3
       '
     links:
       - netstats
     networks:
       priv-eth-net:
-        ipv4_address: 172.16.254.14
+        ipv4_address: 172.16.254.62
 
   eth:
     build: monitored-geth-client
@@ -42,22 +43,43 @@ services:
       - netstats
     entrypoint: /root/start.sh
     volumes:
-      - ./files/password:/root/files/password:ro
-      - ./files/genesis.json:/root/files/genesis.json:ro
-      - ./files/keystore:/root/.ethereum/devchain/keystore:rw
+      - ./config/password:/root/files/password:ro
+      - ./config/genesis.json:/root/files/genesis.json:ro
+      - ./config/keystore:/root/.ethereum/devchain/keystore:rw
       - /etc/localtime:/etc/localtime:ro
     command: '
       --datadir=~/.ethereum/devchain
-      --bootnodes="enode://288b97262895b1c7ec61cf314c2e2004407d0a5dc77566877aad1f2a36659c8b698f4b56fd06c4a0c0bf007b4cfb3e7122d907da3b005fa90e724441902eb19e@172.16.254.14:30303"
+      --bootnodes="enode://288b97262895b1c7ec61cf314c2e2004407d0a5dc77566877aad1f2a36659c8b698f4b56fd06c4a0c0bf007b4cfb3e7122d907da3b005fa90e724441902eb19e@172.16.254.62:30303"
       --networkid=413098575
       --http
       --http.api "admin,debug,web3,eth,txpool,personal,ethash,miner,net"
       --http.corsdomain="*"
-      --netrestrict="172.16.254.0/28"
+      --netrestrict="172.16.254.62/26"
       --verbosity 2
+      --allow-insecure-unlock
       '
     networks:
       priv-eth-net:
+
+  geth_mainnet:
+    image: ethereum/client-go:stable
+    command: '
+      --datadir=~/.ethereum/devchain
+      --http
+      --http.api "admin,debug,web3,eth,txpool,personal,ethash,miner,net"
+      --http.corsdomain="*"
+      --verbosity 4
+      '
+    volumes:
+      - ./config/password:/root/files/password:ro
+      - ./config/keystore:/root/.ethereum/devchain/keystore:rw
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "30303:30303"
+      - "30303:30303/udp"
+      - "8545:8545"
+    networks:
+      pub-eth-net:
   
   ethereumjs:
     container_name: cont_ethereumjs
@@ -69,13 +91,14 @@ services:
     command: '
       npm run --prefix /usr/ibis/ethereumjs-monorepo/packages/client client:start --
       --gethGenesis=/root/genesis.json
-      --bootnodes=enode://288b97262895b1c7ec61cf314c2e2004407d0a5dc77566877aad1f2a36659c8b698f4b56fd06c4a0c0bf007b4cfb3e7122d907da3b005fa90e724441902eb19e@172.16.254.14:30303
+      --bootnodes=enode://288b97262895b1c7ec61cf314c2e2004407d0a5dc77566877aad1f2a36659c8b698f4b56fd06c4a0c0bf007b4cfb3e7122d907da3b005fa90e724441902eb19e@172.16.254.62:30303
       --rpc
-      --discV4=true
-    '
+      --discV4=true'
     volumes:
-    - ./files/ethereumjs-scripts:/usr/ibis/ethereumjs-monorepo/packages/devp2p/examples
-    - ./files/genesis.json:/root/genesis.json:ro
+    - ./config/genesis.json:/root/genesis.json:ro
+    - ./ethereumjs/ethereumjs-scripts:/usr/ibis/ethereumjs-monorepo/packages/devp2p/examples
+    - ./ethereumjs/src/ibis_dpt.ts:/usr/ibis/ethereumjs-monorepo/packages/devp2p/src/dpt/dpt.ts
+    - ./ethereumjs/src/ibis_server.ts:/usr/ibis/ethereumjs-monorepo/packages/devp2p/src/dpt/server.ts
     networks:
       priv-eth-net:
 
@@ -93,13 +116,12 @@ services:
       priv-eth-net:
       pub-eth-net:
 
-
 networks:
   priv-eth-net:
     driver: bridge
     internal: true
     ipam:
       config:
-      - subnet: 172.16.254.0/28
+      - subnet: 172.16.254.62/26
   pub-eth-net:
     driver: bridge

@@ -2,15 +2,25 @@ FROM node:16
 
 WORKDIR /usr/ibis
 
-# install ethereumjs monorepo
-RUN git clone https://github.com/ethereumjs/ethereumjs-monorepo.git \
-    && cd ethereumjs-monorepo \
-    && git submodule init \
-    && git submodule update \
-    && npm i \
-    && npm run build --workspaces
-
 RUN apt update \
     && apt install vim -y
 
-COPY /files /files
+# download ethereumjs monorepo
+RUN git clone https://github.com/ethereumjs/ethereumjs-monorepo.git
+
+# install tests
+RUN cd ethereumjs-monorepo \
+    && git submodule init \
+    && git submodule update
+
+# copy custom src files
+COPY /src/ibis_dpt.ts /usr/ibis/ethereumjs-monorepo/packages/devp2p/src/dpt/dpt.ts
+COPY /src/ibis_server.ts /usr/ibis/ethereumjs-monorepo/packages/devp2p/src/dpt/server.ts
+
+# installnpm
+RUN cd ethereumjs-monorepo \
+    && npm i
+    # && npm run build --workspaces
+    # && npm run build --workspace=@ethereumjs/devp2p
+
+RUN npm install crypto-js

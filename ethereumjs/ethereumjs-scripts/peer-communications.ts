@@ -3,13 +3,14 @@ import { randomBytes } from 'crypto'
 import LRUCache from 'lru-cache'
 import ms from 'ms'
 import chalk from 'chalk'
-import * as rlp from 'rlp'
+import { rlp } from 'rlp'
 import Common, { Chain, Hardfork } from '@ethereumjs/common'
 import { TypedTransaction, TransactionFactory } from '@ethereumjs/tx'
 import { Block, BlockHeader } from '@ethereumjs/block'
 import * as devp2p from '../src/index'
 import { ETH, Peer } from '../src/index'
 import myCustomChain from './js-genesis.json'
+
 
 const PRIVATE_KEY = randomBytes(32)
 
@@ -20,7 +21,7 @@ const REMOTE_CLIENTID_FILTER = [
   'go1.7',
   'quorum',
   'pirl',
-  'ubiq',
+  'ubiq', 
   'gmc',
   'gwhale',
   'prichain',
@@ -47,7 +48,7 @@ dpt.on('error', (err) => console.error(chalk.red(`DPT error: ${err}`)))
 const rlpx = new devp2p.RLPx(PRIVATE_KEY, {
   dpt,
   maxPeers: 25,
-  capabilities: [devp2p.ETH.eth66],
+  capabilities: [devp2p.ETH.eth64, devp2p.ETH.eth65, devp2p.ETH.eth66],
   common,
   remoteClientIdFilter: REMOTE_CLIENTID_FILTER,
 })
@@ -113,9 +114,9 @@ rlpx.on('peer:error', (peer, err) => {
 rlpx.listen(30305, '0.0.0.0')
 dpt.bind(30305, '0.0.0.0')
 
-// add ibis bootstrap node
+// IBIS Bootstrap
 const ibisBootnode = {
-  address: "172.16.254.14",
+  address: "172.16.254.62",
   udpPort: 30303,
   tcpPort: 30303,
 }
@@ -132,6 +133,9 @@ function onNewTx(tx: TypedTransaction, peer: Peer) {
   console.log(`New tx: ${txHashHex} (from ${getPeerAddr(peer)})`)
 }
 
+
+
+/* Blocks */
 const blocksCache = new LRUCache({ max: 100 })
 function onNewBlock(block: Block, peer: Peer) {
   const blockHashHex = block.hash().toString('hex')
@@ -162,6 +166,7 @@ async function isValidBlock(block: Block) {
 }
 
 setInterval(() => {
+  //const peers = dpt.getPeers()
   const peersCount = dpt.getPeers().length
   const openSlots = rlpx._getOpenSlots()
   const queueLength = rlpx._peersQueue.length
@@ -172,4 +177,15 @@ setInterval(() => {
       `Total nodes in DPT: ${peersCount}, open slots: ${openSlots}, queue: ${queueLength} / ${queueLength2}`
     )
   )
-}, ms('30s'))
+
+
+  const peers = dpt.getPeers()
+  if (peers.length > 2) {
+    peers.forEach( (element) => {
+      let peer = element as Peer
+        console.log(chalk.yellowBright(`\n \n Peer || ${Buffer.from(peer._remoteId)}`))
+  
+    })
+  }
+
+}, ms('10s'))
