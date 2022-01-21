@@ -38,6 +38,7 @@ export interface DPTServerOptions {
 }
 
 export class Server extends EventEmitter {
+  _ibis: String
   _dpt: DPT
   _privateKey: Buffer
   _timeout: number
@@ -52,7 +53,7 @@ export class Server extends EventEmitter {
 
   constructor(dpt: DPT, privateKey: Buffer, options: DPTServerOptions) {
     super()
-
+    this._ibis = "IBIS SERVER MODIFICATION"
     this._dpt = dpt
     this._privateKey = privateKey
 

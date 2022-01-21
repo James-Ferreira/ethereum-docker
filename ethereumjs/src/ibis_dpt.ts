@@ -90,7 +90,7 @@ export class DPT extends EventEmitter {
 
   private _id: Buffer | undefined
   private _kbucket: KBucket
-  private _server: DPTServer
+  _server: DPTServer
   private _refreshIntervalId: NodeJS.Timeout
   private _refreshIntervalSelectionCounter: number = 0
   private _shouldFindNeighbours: boolean
