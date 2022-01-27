@@ -24,3 +24,8 @@ RUN cd ethereumjs-monorepo \
     # && npm run build --workspace=@ethereumjs/devp2p
 
 RUN npm install crypto-js
+
+RUN echo 'alias ibis="cd /usr/ibis/ethereumjs-monorepo;\
+        npm i;\
+        cd /usr/ibis/ethereumjs-monorepo/packages/devp2p/";\
+        DEBUG=devp2p:* node -r ts-node/register ./examples/peer-communications.ts' >> ~/.bashrc

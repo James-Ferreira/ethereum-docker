@@ -10,18 +10,18 @@
     "comment": "The IBIS Docker Testbed",
   
     "genesis": {
-      "hash": "0xe3543ec4a70a1794cbebb6895501022f7b30a96ab56c06a5ff668caab02a41db",
+      "hash": "0xdfaa0648072fdf12cdeda5f09be19948b97b66733af7cb69a469000b5766328e",
       "timestamp": 0,
       "gasLimit": 12000000,
       "difficulty": 1,
       "nonce": "0x0000000000000000",
       "extraData": "0x",
-      "stateRoot": "0x85832e08f6193644cfebf6e91cdffa1a5b2fcfa20a78eeb3b6a938c771949716"
+      "stateRoot": "0x2c689e92624a5a8f6d043be49739e02e1a49422af9b0b3e27427f1a85724285f"
     },
   
     "bootstrapNodes": [
       {
-        "ip": "172.16.254.14",
+        "ip": "172.16.254.62",
         "port": 30303,
         "id": "94b82260db33e63d1b7425f11152a50b91887591a2447b233105f392dbae72ce",
         "location": "ap-southeast-1-001",

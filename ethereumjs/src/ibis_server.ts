@@ -53,7 +53,7 @@ export class Server extends EventEmitter {
 
   constructor(dpt: DPT, privateKey: Buffer, options: DPTServerOptions) {
     super()
-    this._ibis = "IBIS SERVER MODIFICATION"
+    this._ibis = "\n\n(( IBIS ))\n\n"
     this._dpt = dpt
     this._privateKey = privateKey
 
@@ -261,4 +261,13 @@ export class Server extends EventEmitter {
       this.msgDebuggers[messageName](msg)
     }
   }
+
+
+  /* -- ibis --*/
+  ibis_message():String {
+    return this._ibis
+  }
+
+
+
 }
