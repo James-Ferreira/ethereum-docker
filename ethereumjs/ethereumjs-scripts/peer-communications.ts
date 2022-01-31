@@ -179,22 +179,13 @@ setInterval(() => {
 
     delve(ibisBootnode, peers[0].id as Buffer)
 
-    // dpt._server.on("peers", (peers) => {
-    //   console.log("(ibis) received neighbours msg")
-    //   console.log(peers)
-    // })
-
   }
-
-
 
 }, ms('5s'))
 
 //add sent findneighbours to queue (with timestamp)
 //wait to receive neighbours through events
 //pair neighbours with their findneighbours
-
-
 
 
   // console.log(
@@ -211,9 +202,6 @@ setInterval(() => {
   //       console.log(chalk.yellowBright(`\n \n Peer || ${Buffer.from(peer._remoteId)}`))
   //   })
   // }
-
-
-
 
 
 

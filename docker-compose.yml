@@ -102,6 +102,21 @@ services:
     networks:
       priv-eth-net:
 
+  cyto:
+    container_name: cyto
+    build: cytoscape
+    working_dir: /app
+    volumes:
+    - type: bind
+      source: ./cytoscape/app
+      target: /app
+    environment:
+      PORT: 8888
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - 8888:8888
+    restart: always
+
   netstats:
     build: eth-netstats
     restart: on-failure
