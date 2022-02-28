@@ -1,5 +1,6 @@
 import assert from 'assert'
 import { randomBytes } from 'crypto'
+import { TextEncoder, TextDecoder } from 'util'
 import LRUCache from 'lru-cache'
 import ms from 'ms'
 import chalk from 'chalk'
@@ -125,15 +126,62 @@ rlpx.on('peer:error', (peer, err) => {
   console.error(chalk.red(`Peer error (${getPeerAddr(peer)}): ${err.stack || err}`))
 })
 
-
 /*
 
   IBIS FUNCTIONS
 
 */
 
+/**
+ * Converts a hexidecimal string into a binary representation
+ * @param hex hexademical string to convert
+ * @returns binary conversion
+ */
+function hex2bin(hex: string){
+  return (parseInt(hex, 16).toString(2)).padStart(8, '0');
+}
+
+/**
+ * Converts a binary string into a hexidecimal representation
+ * @param bin Binary string to convert
+ * @returns hexidecimal conversion
+ */
+function bin2hex(bin: string){
+  return (parseInt(bin, 2).toString(16));
+}
+
+/**
+ * Generates an array of node ids where the index in the array
+ * corresponds to the LOGICAL_DISTANCE from the target node id.
+ * For example, result[1] represents a difference at the 1st bit
+ * @param target target node id
+ */
+function generateDistanceIds(target: string): any[] {
+  let bin = hex2bin(target);
+  let result = [];
+
+  for(let i = 0; i < bin.length; i++) {
+      let val = [...bin];
+      let enc = new TextEncoder().encode(val);
+      if (bin[i] == '1') {
+          val[i] = '0';
+      } else {
+          val[i] = '1'
+      }
+
+      let hex = bin2hex(val.join(""));
+      console.log("bin = " + bin)
+      console.log("val = " + val)
+      console.log("val = " + val)
+      console.log("hex = " + hex)
+      result.push(hex);
+      // result[i] = bin2hex(val.join(""));
+  }
+  return result;
+}
+
 async function delve(target: PeerInfo, delve_id: Buffer) {
-  console.log(chalk.magenta(`(ibis)`) + chalk.green(` delving...`));
+  console.log(chalk.magenta(`(ibis)`) + chalk.green(` delving... (id = ` + delve_id + `)`));
   dpt._server.findneighbours(target, delve_id);
   var x = await new Promise(resolve => dpt._server.on('peers', (peers) => resolve(peers)));
   console.log(chalk.magenta(`(ibis)`) + chalk.green(` received: `));
@@ -168,16 +216,23 @@ setInterval(() => {
   const queueLength2 = rlpx._peersQueue.filter((o) => o.ts <= Date.now()).length
 
   const peers = dpt.getPeers()
-  //const peerid = "288b972"
   //peer id is the first 7 characters from enode
+  const peerid = "288b972"
 
   console.log(dpt._server.ibis_message())
-
+  console.log(peerid + "/" + hex2bin(peerid))
   
   if(peers.length) {
     // console.log(peers[0].id)
-
-    delve(ibisBootnode, peers[0].id as Buffer)
+    // let target_string = new TextDecoder().decode(peers[0].id)
+    let target_string = peers[0].id
+    let delve_ids = generateDistanceIds(target_string)
+    console.log(delve_ids);
+    for(let id of delve_ids) {
+      let uint8_id = new TextEncoder().encode(id);
+      console.log("...delving id " + target_string + "with" + id)
+      delve(ibisBootnode, peers[0].id as Buffer)
+    }
 
   }
 
