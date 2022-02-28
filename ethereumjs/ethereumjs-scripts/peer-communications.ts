@@ -13,7 +13,8 @@ import { ETH, Peer } from '../src/index'
 import myCustomChain from './js-genesis.json'
 
 /* IBIS IMPORTS */
-import { PeerInfo } from '@ethereumjs/devp2p'
+import { PeerInfo, xor } from '@ethereumjs/devp2p'
+import { buffer2int } from '@ethereumjs/devp2p'
 
 var GENESIS_DIFFICULTY = 1;
 var GENESIS_HASH = "dfaa0648072fdf12cdeda5f09be19948b97b66733af7cb69a469000b5766328e";
@@ -138,7 +139,7 @@ rlpx.on('peer:error', (peer, err) => {
  * @returns binary conversion
  */
 function hex2bin(hex: string){
-  return (parseInt(hex, 16).toString(2)).padStart(8, '0');
+  return (parseInt(hex, 16).toString(2)).padStart(8, '1');
 }
 
 /**
@@ -156,36 +157,43 @@ function bin2hex(bin: string){
  * For example, result[1] represents a difference at the 1st bit
  * @param target target node id
  */
-function generateDistanceIds(target: string): any[] {
-  let bin = hex2bin(target);
+function generateDistanceIds(target: Buffer): any[] {
+
   let result = [];
-
-  for(let i = 0; i < bin.length; i++) {
-      let val = [...bin];
-      let enc = new TextEncoder().encode(val);
-      if (bin[i] == '1') {
-          val[i] = '0';
+  
+  for(let i = 0; i < target.length; i++) {
+      let val = Buffer.from(target);
+      if (target[i] == 1) {
+          val[i] = 0;
       } else {
-          val[i] = '1'
+          val[i] = 1
       }
-
-      let hex = bin2hex(val.join(""));
-      console.log("bin = " + bin)
-      console.log("val = " + val)
-      console.log("val = " + val)
-      console.log("hex = " + hex)
-      result.push(hex);
-      // result[i] = bin2hex(val.join(""));
+      
+      // console.log("target = " + target)
+      // console.log("val = " + val)
+      // console.log("hex = " + val.toString("hex"))
+      result.push(val);
   }
   return result;
 }
 
 async function delve(target: PeerInfo, delve_id: Buffer) {
-  console.log(chalk.magenta(`(ibis)`) + chalk.green(` delving... (id = ` + delve_id + `)`));
+  // let log_dist = (xor(delve_id, dpt.getPeer(target)?.id))
+  try {
+    let log_dist = xor(delve_id, dpt.getPeer(target)?.id as Buffer);
+    let dist = Math.log2(buffer2int(log_dist));
+    console.log("delving distance = " + buffer2int(log_dist) + "/" + dist);
+  } catch (e) {
+    return console.log(e);
+  }
+
+
+  console.log(chalk.magenta(`(ibis)`) + chalk.green(` delving... )`));
   dpt._server.findneighbours(target, delve_id);
   var x = await new Promise(resolve => dpt._server.on('peers', (peers) => resolve(peers)));
   console.log(chalk.magenta(`(ibis)`) + chalk.green(` received: `));
   console.log(x);
+
 
   console.log(`
 
@@ -207,34 +215,23 @@ setInterval(() => {
   ███    ███    ███ ███     ▄█    ███ 
   █▀   ▄█████████▀  █▀    ▄████████▀  
   `)
+  console.log(dpt._server.ibis_message())
 
-
-  //const peers = dpt.getPeers()
-  const peersCount = dpt.getPeers().length
-  const openSlots = rlpx._getOpenSlots()
-  const queueLength = rlpx._peersQueue.length
-  const queueLength2 = rlpx._peersQueue.filter((o) => o.ts <= Date.now()).length
 
   const peers = dpt.getPeers()
   //peer id is the first 7 characters from enode
-  const peerid = "288b972"
+  // const peerid = "288b972"
 
-  console.log(dpt._server.ibis_message())
-  console.log(peerid + "/" + hex2bin(peerid))
   
-  if(peers.length) {
-    // console.log(peers[0].id)
-    // let target_string = new TextDecoder().decode(peers[0].id)
-    let target_string = peers[0].id
-    let delve_ids = generateDistanceIds(target_string)
-    console.log(delve_ids);
-    for(let id of delve_ids) {
-      let uint8_id = new TextEncoder().encode(id);
-      console.log("...delving id " + target_string + "with" + id)
-      delve(ibisBootnode, peers[0].id as Buffer)
-    }
+  for(const peer of peers) {
+    let delve_ids = generateDistanceIds(peer.id as Buffer);
 
+    for(let id of delve_ids) {
+      // console.log("...delving id " + peer.id + "with" + id)
+      delve(ibisBootnode, id as Buffer)
+    }
   }
+
 
 }, ms('5s'))
 
@@ -303,3 +300,9 @@ setInterval(() => {
 //   txCache.set(txHashHex, true)
 //   console.log(`New tx: ${txHashHex} (from ${getPeerAddr(peer)})`)
 // }
+
+
+// const peersCount = dpt.getPeers().length
+// const openSlots = rlpx._getOpenSlots()
+// const queueLength = rlpx._peersQueue.length
+// const queueLength2 = rlpx._peersQueue.filter((o) => o.ts <= Date.now()).length
