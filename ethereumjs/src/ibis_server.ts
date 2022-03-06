@@ -8,7 +8,7 @@ import { keccak256, pk2id, createDeferred, formatLogId } from '../util'
 import { DPT, PeerInfo } from './dpt'
 import { Socket as DgramSocket, RemoteInfo } from 'dgram'
 
-const DEBUG_BASE_NAME = 'devp2p:dpt:ibis_server2'
+const DEBUG_BASE_NAME = 'devp2p:dpt:ibis_server'
 const debug = createDebugLogger(DEBUG_BASE_NAME)
 const verbose = createDebugLogger('verbose').enabled
 
@@ -38,7 +38,7 @@ export interface DPTServerOptions {
 }
 
 export class Server extends EventEmitter {
-  _ibis: String
+  _ibis_msg: String
   _dpt: DPT
   _privateKey: Buffer
   _timeout: number
@@ -53,7 +53,16 @@ export class Server extends EventEmitter {
 
   constructor(dpt: DPT, privateKey: Buffer, options: DPTServerOptions) {
     super()
-    this._ibis = "\n\n(( IBIS ))\n\n"
+    this._ibis_msg = `
+    ▄█  ▀█████████▄   ▄█     ▄████████ 
+    ███    ███    ███ ███    ███    ███ 
+    ███▌   ███    ███ ███▌   ███    █▀  
+    ███▌  ▄███▄▄▄██▀  ███▌   ███        
+    ███▌ ▀▀███▀▀▀██▄  ███▌ ▀███████████ 
+    ███    ███    ██▄ ███           ███ 
+    ███    ███    ███ ███     ▄█    ███ 
+    █▀   ▄█████████▀  █▀    ▄████████▀  
+    `
     this._dpt = dpt
     this._privateKey = privateKey
 
@@ -265,7 +274,7 @@ export class Server extends EventEmitter {
 
   /* -- ibis --*/
   ibis_message():String {
-    return this._ibis
+    return this._ibis_msg;
   }
 
 
