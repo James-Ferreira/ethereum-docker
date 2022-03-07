@@ -4,9 +4,12 @@ import chalk from 'chalk'
 import { TypedTransaction, TransactionFactory, JsonTx } from '@ethereumjs/tx'
 import * as devp2p from '../src/index'
 
-import { PeerInfo, xor, ETH, Peer, } from '@ethereumjs/devp2p'
+import { PeerInfo, xor, ETH, Peer, DPT, } from '@ethereumjs/devp2p'
 import { buffer2int } from '@ethereumjs/devp2p'
 import { Address } from 'ethereumjs-util'
+
+type NodeType = { id: string, lastSeen: string}
+type Record = {id: string, lastSeen: string}
 
 export default class IbisWorker extends EventEmitter{
     _private_key: Buffer
@@ -15,6 +18,8 @@ export default class IbisWorker extends EventEmitter{
     _ttx_hashes: Set<string>
     _dpt: devp2p.DPT
     _rlpx: devp2p.RLPx
+    _graph: { [id: string]: Record[]}
+    _map: Map<string, string>
 
     constructor(private_key: Buffer, dpt: devp2p.DPT, rlpx: devp2p.RLPx) {
       super()
@@ -23,7 +28,8 @@ export default class IbisWorker extends EventEmitter{
       this._rlpx = rlpx;
       this._rlpx_peers = new Set<Peer>();
       this._ttx_hashes = new Set<string>();
-
+      this._graph = {};
+      this._map = new Map()
     }
 
 
@@ -90,26 +96,43 @@ export default class IbisWorker extends EventEmitter{
   }
 
   async delve(target: PeerInfo, delve_id: Buffer) {
-    // let log_dist = (xor(delve_id, dpt.getPeer(target)?.id))
-    try {
-      let log_dist = xor(delve_id, this._dpt.getPeer(target)?.id as Buffer);
-      let dist = Math.log2(buffer2int(log_dist));
-      console.log("delving distance = " + buffer2int(log_dist) + "/" + dist);
-    } catch (e) {
-      return console.log(e);
+    if(!target.address) {
+      console.log("no target address, exiting delve")
+      return;
     }
-  
-  
-    console.log(chalk.magenta(`(ibis)`) + chalk.green(` delving... )`));
+    console.log(chalk.magenta(`(ibis)`) + chalk.green(` delving... ` + chalk.cyan(target.address)));
+
+    // let log_dist = (xor(delve_id, dpt.getPeer(target)?.id))
+    // try {
+    //   let log_dist = xor(delve_id, this._dpt.getPeer(target)?.id as Buffer);
+    //   let dist = Math.log2(buffer2int(log_dist));
+    //   console.log("delving distance = " + buffer2int(log_dist) + "/" + dist);
+    // } catch (e) {
+    //   return console.log(e);
+    // }
+    
     this._dpt._server.findneighbours(target, delve_id);
-    var x = await new Promise(resolve => this._dpt._server.on('peers', (peers) => resolve(peers)));
-    console.log(chalk.magenta(`(ibis)`) + chalk.green(` received: `));
-    console.log(x);
-  
+    var response: PeerInfo[] = await new Promise(resolve => this._dpt._server.on('peers', (peers) => resolve(peers)));
+    console.log(chalk.magenta(`(ibis) `) + chalk.green(`received `) + response.length + chalk.green(` neighbours`));
+    for(let entry of response) {
+      if(target.address && entry.address) this.addEdge(target.address, entry.address);
+    }
+    // if(response["address"]) {
+    //   this.addEdge(target.address, response["address"])
+    // }
   
     console.log(`
-    +#+#+#+#+#+#+ +#+#+#+#+#+#+ +#+#+#+#+#+#+ +#+#+#+#+#+#+ 
+    ...delving complete
     `)
+  }
+
+  addEdge(src: string, dst: string) {
+    if(src == dst) return;
+    const key = src + "," + dst;
+    if(!this._map.has(key)) console.log(chalk.cyan(`...adding new edge `) + src + " -> " + dst)
+    else console.log(chalk.grey(`...updating existing edge `) + src + " -> " + dst)
+
+    this._map.set(key, new Date().toString())
   }
 
   pollNetwork() {
@@ -117,11 +140,33 @@ export default class IbisWorker extends EventEmitter{
     console.log(this.print_status());
 
     /* TTx */
-    for(let peer of this._rlpx.getPeers()) {
-      this.sendTTx(peer as unknown as Peer);
-    }
+    // for(let peer of this._rlpx.getPeers()) {
+    //   this.sendTTx(peer as unknown as Peer);
+    // }
 
     /* Delving */
+    for(let peer of this._dpt.getPeers()) {
+      let delve_ids = generateDistanceIds(peer.id as Buffer);
+      this.delve(peer, peer.id as Buffer)
+
+      // for(let id of delve_ids) {
+      //   this.delve(peer, id)
+      // }
+    }
+
+
+    /* Node Map */
+    console.log("\n node map testing");
+
+    this.addEdge("a", "b");
+    this.addEdge("c", "d");
+    this.addEdge("c", "a");
+    this.addEdge("a", "b");
+    this.addEdge("b", "a");
+
+
+
+
     // const peers = dpt.getPeers()
   
     // for(const peer of peers) {
@@ -139,6 +184,8 @@ export default class IbisWorker extends EventEmitter{
     console.log(" | IBIS STATUS |")
     console.log("rlpx peers: ", this._rlpx.getPeers().length);
     console.log("dpt peers: ", this._dpt.getPeers().length);
+    console.log(this._map);
+
   }
 
 }
