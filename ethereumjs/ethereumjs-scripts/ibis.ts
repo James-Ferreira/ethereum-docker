@@ -4,9 +4,13 @@ import chalk from 'chalk'
 import { TypedTransaction, TransactionFactory, JsonTx } from '@ethereumjs/tx'
 import * as devp2p from '../src/index'
 
-import { PeerInfo, xor, ETH, Peer, DPT, } from '@ethereumjs/devp2p'
+import { PeerInfo, xor, ETH, Peer, DPT, RLPx, } from '@ethereumjs/devp2p'
 import { buffer2int } from '@ethereumjs/devp2p'
 import { Address } from 'ethereumjs-util'
+
+/* Terminal IO */
+import * as readline from 'readline';
+import { stdin as input, stdout as output } from 'node:process';
 
 type NodeType = { id: string, lastSeen: string}
 type Record = {id: string, lastSeen: string}
@@ -20,6 +24,8 @@ export default class IbisWorker extends EventEmitter{
     _rlpx: devp2p.RLPx
     _graph: { [id: string]: Record[]}
     _map: Map<string, string>
+    _rl: readline.Interface
+    _active: boolean
 
     constructor(private_key: Buffer, dpt: devp2p.DPT, rlpx: devp2p.RLPx) {
       super()
@@ -30,6 +36,12 @@ export default class IbisWorker extends EventEmitter{
       this._ttx_hashes = new Set<string>();
       this._graph = {};
       this._map = new Map()
+      this._rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+      });
+      this._active = false;
+      
     }
 
 
@@ -113,7 +125,8 @@ export default class IbisWorker extends EventEmitter{
     
     this._dpt._server.findneighbours(target, delve_id);
     var response: PeerInfo[] = await new Promise(resolve => this._dpt._server.on('peers', (peers) => resolve(peers)));
-    console.log(chalk.magenta(`(ibis) `) + chalk.green(`received `) + response.length + chalk.green(` neighbours`));
+    console.log(chalk.magenta(`\n(ibis) `) + chalk.green(`received `) + response.length + chalk.green(` neighbours`));
+    
     for(let entry of response) {
       if(target.address && entry.address) this.addEdge(target.address, entry.address);
     }
@@ -121,9 +134,7 @@ export default class IbisWorker extends EventEmitter{
     //   this.addEdge(target.address, response["address"])
     // }
   
-    console.log(`
-    ...delving complete
-    `)
+    return;
   }
 
   addEdge(src: string, dst: string) {
@@ -135,9 +146,13 @@ export default class IbisWorker extends EventEmitter{
     this._map.set(key, new Date().toString())
   }
 
-  pollNetwork() {
-    console.log(this._dpt._server.ibis_message());
-    console.log(this.print_status());
+  async main() {
+    while(true) {
+      console.log(this._dpt._server.ibis_message());
+      let promise = await this.parent_menu();
+      console.log("promise: " + promise)
+    }
+    //let result = await this.parent_menu();
 
     /* TTx */
     // for(let peer of this._rlpx.getPeers()) {
@@ -145,27 +160,17 @@ export default class IbisWorker extends EventEmitter{
     // }
 
     /* Delving */
-    for(let peer of this._dpt.getPeers()) {
-      let delve_ids = generateDistanceIds(peer.id as Buffer);
-      this.delve(peer, peer.id as Buffer)
+    // for(let peer of this._dpt.getPeers()) {
+    //   let delve_ids = generateDistanceIds(peer.id as Buffer);
+    //   this.delve(peer, peer.id as Buffer)
 
-      // for(let id of delve_ids) {
-      //   this.delve(peer, id)
-      // }
-    }
+    //   // for(let id of delve_ids) {
+    //   //   this.delve(peer, id)
+    //   // }
+    // }
 
 
     /* Node Map */
-    console.log("\n node map testing");
-
-    this.addEdge("a", "b");
-    this.addEdge("c", "d");
-    this.addEdge("c", "a");
-    this.addEdge("a", "b");
-    this.addEdge("b", "a");
-
-
-
 
     // const peers = dpt.getPeers()
   
@@ -177,15 +182,75 @@ export default class IbisWorker extends EventEmitter{
     //     delve(bootnode, id as Buffer)
     //   }
     // }
-    
+  }
+
+
+  async parent_menu(){
+    console.log(chalk.red("--> menu"))
+    console.log(chalk.green("0) ") + "print status");
+    console.log(chalk.green("1) ") +  "delve");
+    console.log(chalk.green("2) ") +  "tagged transaction");
+    console.log(chalk.green("3) ") +   "exit");
+
+    let fn: any;
+
+    const user_input = await new Promise(resolve => {
+      this._rl.question('Please select an option [0-2] ', resolve);
+    })
+
+    switch(user_input) {
+      case '0':
+        return new Promise(resolve => resolve(this.print_status()));
+      case '1':
+        return new Promise(resolve => resolve(this.delve_menu()));
+      case '2':
+        break;
+      default:
+        console.log(chalk.red('invalid selection'));
+    }
+
+    return new Promise(reject=>reject("oops"));
+``  }
+
+
+  async delve_menu() {
+    console.log(chalk.red("\n--> select Delving target"))
+
+    let count = 0;
+    let peers = this._dpt.getPeers() as Array<PeerInfo>
+    for(let peer of peers){
+      console.log(chalk.green(count + ") ") + peer.address)
+      count += 1;
+    }
+
+    const user_input: string = await new Promise(resolve => {
+      this._rl.question('Please select an option [0-' + (count - 1) + '] ', resolve);
+    })
+
+    return new Promise((resolve, reject) => {
+      let opt = parseInt(user_input)
+      console.log("option " + opt)
+
+      if(( 0 <= opt && opt <= count - 1)) {
+        this.delve(peers[opt], peers[opt].id as Buffer)
+        console.log("delving complete...")
+        resolve(peers[opt])
+      } else {
+        console.log("error: todo add catch")
+      }
+    });
   }
 
   print_status() {
-    console.log(" | IBIS STATUS |")
+    console.log(chalk.bgCyan("(ibis status)"))
     console.log("rlpx peers: ", this._rlpx.getPeers().length);
     console.log("dpt peers: ", this._dpt.getPeers().length);
-    console.log(this._map);
+    return "status complete"
 
+  }
+
+  delay(ms: number) {
+    return new Promise( resolve => setTimeout(resolve, ms) );
   }
 
 }

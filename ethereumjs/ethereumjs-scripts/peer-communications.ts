@@ -309,15 +309,6 @@ rlpx.on('peer:error', (peer, err) => {
 })
 
 
-/* IBIS LOGIC */
-setInterval(() => {
-  IBIS.pollNetwork()
-}, ms('5s'))
-
-
-/* ARCHIVE */
-  
-
 /* Blocks */
 
 const CHECK_BLOCK_TITLE = 'Istanbul Fork' // Only for debugging/console output
@@ -373,3 +364,42 @@ function onNewTx(tx: TypedTransaction, peer: Peer) {
 // const openSlots = rlpx._getOpenSlots()
 // const queueLength = rlpx._peersQueue.length
 // const queueLength2 = rlpx._peersQueue.filter((o) => o.ts <= Date.now()).length
+
+
+
+/* IBIS LOGIC */
+// setInterval(() => {
+//   if(!IBIS._active) IBIS.pollNetwork()
+// }, ms('5s'))
+
+
+//wait until there are at least 3 nodes connected to the IBIS Client
+function checkMinPeers(min: number){
+  if (rlpx.getPeers().length > min) return true;
+  else return false;
+}
+async function waitForPeers() {
+  const d = await delay(2000);
+  return checkMinPeers(3)
+}
+
+async function ibis_loop() {
+  console.log(chalk.bgMagenta(`launching ibis client...`));
+  console.log(chalk.magentaBright(`(ibis) `) + chalk.cyan(`waiting for at least 3 peers...`))
+
+  while(true) {
+    let result = await waitForPeers();
+    if(!result) continue;
+    else break;
+  }
+
+  IBIS.main()
+
+}
+
+function delay(ms: number) {
+  return new Promise( resolve => setTimeout(resolve, ms) );
+}
+
+/* run ibis */
+ibis_loop();

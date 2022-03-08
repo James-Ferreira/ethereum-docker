@@ -174,6 +174,7 @@ export class DPT extends EventEmitter {
     const DIFF_TIME_MS = 200
     let ms = 0
     for (const peer of peers) {
+      if(peer.address && peer.address == "127.0.0.1") continue;
       setTimeout(() => {
         this.addPeer(peer).catch((error) => {
           this.emit('error', error)
