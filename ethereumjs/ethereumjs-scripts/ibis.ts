@@ -3,9 +3,10 @@ import ms from 'ms'
 import chalk from 'chalk'
 import { TypedTransaction, TransactionFactory, JsonTx } from '@ethereumjs/tx'
 import * as devp2p from '../src/index'
+import { randomBytes } from 'crypto'
 
-import { PeerInfo, xor, ETH, Peer, DPT, RLPx, } from '@ethereumjs/devp2p'
-import { buffer2int } from '@ethereumjs/devp2p'
+import { PeerInfo, xor, ETH, Peer, DPT, RLPx, keccak256, } from '@ethereumjs/devp2p'
+import { buffer2int, int2buffer } from '@ethereumjs/devp2p'
 import { Address } from 'ethereumjs-util'
 
 /* Terminal IO */
@@ -107,35 +108,127 @@ export default class IbisWorker extends EventEmitter{
     }
   }
 
+
+
+
+  /* Delving Functions */
+
+  async delve_menu() {
+    console.log(chalk.red("\n select Delving target"))
+
+    let count = 0;
+    let peers = this._dpt.getPeers() as Array<PeerInfo>
+    for(let peer of peers){
+      console.log(chalk.green(count + ") ") + peer.address)
+      count += 1;
+    }
+
+    const user_input: string = await new Promise(resolve => {
+      this._rl.question('Please select an option [0-' + (count - 1) + '] ', resolve);
+    })
+
+    return new Promise((resolve, reject) => {
+      let opt = parseInt(user_input)
+      console.log("option " + opt)
+
+      if(( 0 <= opt && opt <= count - 1)) {
+        this.delve(peers[opt], peers[opt].id as Buffer)
+        console.log("delving complete...")
+        resolve(peers[opt])
+      } else {
+        console.log("error: todo add catch")
+      }
+    });
+  }
+
+
   async delve(target: PeerInfo, delve_id: Buffer) {
+
     if(!target.address) {
       console.log("no target address, exiting delve")
       return;
     }
     console.log(chalk.magenta(`(ibis)`) + chalk.green(` delving... ` + chalk.cyan(target.address)));
+    let targetHash = keccak256(target.id as Buffer);
 
-    // let log_dist = (xor(delve_id, dpt.getPeer(target)?.id))
-    // try {
-    //   let log_dist = xor(delve_id, this._dpt.getPeer(target)?.id as Buffer);
-    //   let dist = Math.log2(buffer2int(log_dist));
-    //   console.log("delving distance = " + buffer2int(log_dist) + "/" + dist);
-    // } catch (e) {
-    //   return console.log(e);
-    // }
-    
-    this._dpt._server.findneighbours(target, delve_id);
-    var response: PeerInfo[] = await new Promise(resolve => this._dpt._server.on('peers', (peers) => resolve(peers)));
-    console.log(chalk.magenta(`\n(ibis) `) + chalk.green(`received `) + response.length + chalk.green(` neighbours`));
-    
-    for(let entry of response) {
-      if(target.address && entry.address) this.addEdge(target.address, entry.address);
+    // calculate ids for each k-bucket
+    //todo: these could be stored outside of the program to speed it up
+    let DELVE_IDS : Buffer[] = this.generateDistanceIds(target.id as Buffer);
+
+
+    // send a FIND_NEIGHBOURS message, targeted to each k-bucket
+    for (let delve_id of DELVE_IDS) {
+      if(!delve_id) {
+        continue
+      }
+      let dist = this.calculateLogicalDistance(targetHash, keccak256(delve_id));
+
+      console.log(chalk.cyan("delving distance = ") + chalk.red(dist.toString()));
+      console.log(chalk.cyan("delving with id = ") + chalk.red(delve_id.toString('hex')));
+      this._dpt._server.findneighbours(target, delve_id);
+      var response: PeerInfo[] = await new Promise(resolve => this._dpt._server.on('peers', (peers) => resolve(peers)));
+      console.log(chalk.magenta(`(ibis) `) + chalk.green(`received `) + response.length + chalk.green(` neighbours`));
+      
+      for(let entry of response) {
+        if(target.address && entry.address) this.addEdge(target.address, entry.address);
+      }
+
+      //wait
+      await this.delay(500);
     }
-    // if(response["address"]) {
-    //   this.addEdge(target.address, response["address"])
-    // }
+    
+
+
   
     return;
   }
+
+
+  
+  /**
+   * Generates an array of node ids where the index in the array
+   * corresponds to the LOGICAL_DISTANCE from the target node id.
+   * For example, result[1] represents a difference at the 1st bit
+   * 
+   * Note: computations use the keccak256 hash of the 512-bit public key
+   * @param target target node id
+   */
+  generateDistanceIds(target: Buffer): Buffer[] {
+    let start_time = new Date().getTime();
+
+    let arr = new Array<Buffer>(255);
+    let hash = keccak256(target)
+    let count = 0;
+    let success = 0
+
+    while(true) {
+      if (success > 254) break;
+      let randomId = randomBytes(32)
+      let logicalDistance = this.calculateLogicalDistance(hash, keccak256(randomId));
+
+      if(!arr[logicalDistance]) {
+        arr[logicalDistance] = randomId
+        success += 1
+      }
+        
+      count += 1;
+    }
+
+  // get total minutes between two dates
+    let end_time = new Date().getTime();
+    var minutes = Math.abs(start_time - end_time) / 1000 / 60;
+    console.log("calculated %d delve_ids in %d attempts and %d minutes", success, count, minutes);
+    return arr;
+  }
+
+  //todo: fix this
+  calculateLogicalDistance(x: Buffer, y: Buffer): number {
+    let log_dist = xor(x, y);
+    return Math.floor(Math.log2(buffer2int(log_dist)));
+}
+
+
+  // - - - 
 
   addEdge(src: string, dst: string) {
     if(src == dst) return;
@@ -147,12 +240,14 @@ export default class IbisWorker extends EventEmitter{
   }
 
   async main() {
+    console.log(this._dpt._server.ibis_message());
     while(true) {
-      console.log(this._dpt._server.ibis_message());
+      //console.clear()
       let promise = await this.parent_menu();
       console.log("promise: " + promise)
+
+      console.log(chalk.green("\n\nrestarting...\n\n"));
     }
-    //let result = await this.parent_menu();
 
     /* TTx */
     // for(let peer of this._rlpx.getPeers()) {
@@ -186,11 +281,11 @@ export default class IbisWorker extends EventEmitter{
 
 
   async parent_menu(){
-    console.log(chalk.red("--> menu"))
-    console.log(chalk.green("0) ") + "print status");
-    console.log(chalk.green("1) ") +  "delve");
-    console.log(chalk.green("2) ") +  "tagged transaction");
-    console.log(chalk.green("3) ") +   "exit");
+    console.log(chalk.bgWhite(chalk.black("       MENU        ")));
+    console.log(chalk.green("   0) ") + "print status");
+    console.log(chalk.green("   1) ") +  "delve");
+    console.log(chalk.green("   2) ") +  "tagged transaction");
+    console.log(chalk.green("   3) ") +   "exit");
 
     let fn: any;
 
@@ -213,40 +308,12 @@ export default class IbisWorker extends EventEmitter{
 ``  }
 
 
-  async delve_menu() {
-    console.log(chalk.red("\n--> select Delving target"))
-
-    let count = 0;
-    let peers = this._dpt.getPeers() as Array<PeerInfo>
-    for(let peer of peers){
-      console.log(chalk.green(count + ") ") + peer.address)
-      count += 1;
-    }
-
-    const user_input: string = await new Promise(resolve => {
-      this._rl.question('Please select an option [0-' + (count - 1) + '] ', resolve);
-    })
-
-    return new Promise((resolve, reject) => {
-      let opt = parseInt(user_input)
-      console.log("option " + opt)
-
-      if(( 0 <= opt && opt <= count - 1)) {
-        this.delve(peers[opt], peers[opt].id as Buffer)
-        console.log("delving complete...")
-        resolve(peers[opt])
-      } else {
-        console.log("error: todo add catch")
-      }
-    });
-  }
-
   print_status() {
     console.log(chalk.bgCyan("(ibis status)"))
-    console.log("rlpx peers: ", this._rlpx.getPeers().length);
-    console.log("dpt peers: ", this._dpt.getPeers().length);
+    console.log(chalk.grey("RLPx peers: ") + chalk.cyan(this._rlpx.getPeers().length.toString()));
+    console.log(chalk.grey("DPT peers: ") + chalk.cyan(this._dpt.getPeers().length.toString()));
+    console.log(chalk.grey("Graph size: ") + chalk.cyan(this._map.size.toString()));
     return "status complete"
-
   }
 
   delay(ms: number) {
@@ -281,31 +348,6 @@ function bin2hex(bin: string){
   return (parseInt(bin, 2).toString(16));
 }
 
-/**
- * Generates an array of node ids where the index in the array
- * corresponds to the LOGICAL_DISTANCE from the target node id.
- * For example, result[1] represents a difference at the 1st bit
- * @param target target node id
- */
-function generateDistanceIds(target: Buffer): any[] {
-
-  let result = [];
-  
-  for(let i = 0; i < target.length; i++) {
-      let val = Buffer.from(target);
-      if (target[i] == 1) {
-          val[i] = 0;
-      } else {
-          val[i] = 1
-      }
-      
-      // console.log("target = " + target)
-      // console.log("val = " + val)
-      // console.log("hex = " + val.toString("hex"))
-      result.push(val);
-  }
-  return result;
-}
 
 
   
