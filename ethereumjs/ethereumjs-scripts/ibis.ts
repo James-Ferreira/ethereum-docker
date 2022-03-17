@@ -18,6 +18,7 @@ type Record = {id: string, lastSeen: string}
 
 export default class IbisWorker extends EventEmitter{
     _private_key: Buffer
+    _address: Address
     // _target: PeerInfo
     _rlpx_peers: Set<Peer>
     _ttx_hashes: Set<string>
@@ -31,6 +32,7 @@ export default class IbisWorker extends EventEmitter{
     constructor(private_key: Buffer, dpt: devp2p.DPT, rlpx: devp2p.RLPx) {
       super()
       this._private_key = private_key;
+      this._address = Address.fromPrivateKey(private_key);
       this._dpt = dpt;
       this._rlpx = rlpx;
       this._rlpx_peers = new Set<Peer>();
@@ -42,8 +44,41 @@ export default class IbisWorker extends EventEmitter{
         output: process.stdout
       });
       this._active = false;
-      
+
     }
+
+
+
+  /* TAGGED TRANSACTION FUNCTIONS */
+
+  async ttx_menu() {
+    console.log(chalk.red("\n TTx targets"))
+    let count = 0;
+    let peers = this._rlpx.getPeers() as Array<devp2p.Peer>;
+
+    for(let peer of peers){
+      let addr = peer._socket.remoteAddress;
+      let id = peer.getId();
+      if (addr && id) console.log(chalk.green(count + ") ") + addr + " (" + id.toString('hex').slice(0, 7) + ")")
+      count += 1;
+    }
+
+    const user_input: string = await new Promise(resolve => {
+      this._rl.question('Please select an option [0-' + (count - 1) + '] ', resolve);
+    })
+
+    return new Promise((resolve, reject) => {
+      let opt = parseInt(user_input)
+
+      if(( 0 <= opt && opt <= count - 1)) {
+        this.sendTTx(peers[opt]);
+        console.log("ttx complete...")
+        resolve(peers[opt])
+      } else {
+        console.log("error: todo add catch")
+      }
+    });
+  }
 
 
   /**
@@ -51,7 +86,7 @@ export default class IbisWorker extends EventEmitter{
    * Peer and returns the Transaction hash
    */
    createTTx() {
-  
+
     const tx = TransactionFactory.fromTxData({
       nonce: 0,
       gasPrice: 100,
@@ -60,12 +95,11 @@ export default class IbisWorker extends EventEmitter{
       data:
         '0x7f4e616d65526567000000000000000000000000000000000000000000000000003057307f4e616d6552656700000000000000000000000000000000000000000000000000573360455760415160566000396000f20036602259604556330e0f600f5933ff33560f601e5960003356576000335700604158600035560f602b590033560f60365960003356573360003557600035335700',
     })
-  
+
     const signedTx = tx.sign(this._private_key)
-  
-    const address = Address.fromPrivateKey(this._private_key)
-  
-    if (signedTx.validate() && signedTx.getSenderAddress().equals(address)) {
+
+
+    if (signedTx.validate() && signedTx.getSenderAddress().equals(this._address)) {
       console.log('Valid signature')
     } else {
       console.log('Invalid signature')
@@ -74,7 +108,7 @@ export default class IbisWorker extends EventEmitter{
     return signedTx;
   }
 
-  sendTTx(target: Peer) {
+  async sendTTx(target: devp2p.Peer) {
     console.log(chalk.magenta(`(ibis)`) + chalk.green(` generating ttx...`));
 
     // create the tagged transaction
@@ -85,36 +119,54 @@ export default class IbisWorker extends EventEmitter{
     const eth = target.getProtocols()[0]
     try {
       console.log(chalk.gray(`...sending ttx with hash `), txHash);
+
       if(eth instanceof devp2p.ETH) {
         (eth as devp2p.ETH).sendMessage(devp2p.ETH.MESSAGE_CODES.TX, ttx.serialize().toString('hex'))
+          console.log(chalk.green(` sent ttx...`));
       } else {
         console.log(chalk.gray(`...peer using LES protocol, ttx not sent`))
       }
+
+      console.log("waiting on ttx response...")
+
+      // wait for ttx to return
+      //todo: add a timeout
+      var response = await new Promise(resolve =>
+        eth.on('message', async (code: ETH.MESSAGE_CODES, payload: any) => {
+          console.log(chalk.magenta(`(ibis)`) + chalk.green(` received msg w/ code: `) + code);
+          if(code == devp2p.ETH.MESSAGE_CODES.TX) {
+            console.log(chalk.magenta(`(ibis)`) + chalk.green(` received tx...`));
+          }
+          resolve(payload)}
+        ));
+
+      console.log("ttx response: " + response);
       this._ttx_hashes.add(txHash)
-      console.log(chalk.green(` sent ttx...`));    } catch (e) {
-      console.log(e);
-    }
+      } catch(e){
+        console.log(e);
+      }
+
+
 
   }
 
   verifyTTx(tx: TypedTransaction) {
     console.log(chalk.magenta(`(ibis)`) + chalk.green(` received tx, checking if ttx... )`));
+    console.log(chalk.gray(`...currently ${this._ttx_hashes.size} TTx's in circulation`))
+
     if(tx.hash().toString('hex') in this._ttx_hashes) {
-      console.log(chalk.green(`IBIS IS GO`));
+      console.log(chalk.green(`...parsed message is a ttx`));
       return true;
     } else {
-      console.log(chalk.red(`IBIS IS NO`));
+      console.log(chalk.red(`...parsed message is not a ttx`));
       return false;
     }
   }
 
-
-
-
   /* Delving Functions */
 
   async delve_menu() {
-    console.log(chalk.red("\n select Delving target"))
+    console.log(chalk.red("\n Delving targets"))
 
     let count = 0;
     let peers = this._dpt.getPeers() as Array<PeerInfo>
@@ -129,7 +181,6 @@ export default class IbisWorker extends EventEmitter{
 
     return new Promise((resolve, reject) => {
       let opt = parseInt(user_input)
-      console.log("option " + opt)
 
       if(( 0 <= opt && opt <= count - 1)) {
         this.delve(peers[opt], peers[opt].id as Buffer)
@@ -155,12 +206,13 @@ export default class IbisWorker extends EventEmitter{
     //todo: these could be stored outside of the program to speed it up
     let DELVE_IDS : Buffer[] = this.generateDistanceIds(target.id as Buffer);
 
-
+  
     // send a FIND_NEIGHBOURS message, targeted to each k-bucket
     for (let delve_id of DELVE_IDS) {
       if(!delve_id) {
         continue
       }
+
       let dist = this.calculateLogicalDistance(targetHash, keccak256(delve_id));
 
       console.log(chalk.cyan("delving distance = ") + chalk.red(dist.toString()));
@@ -168,7 +220,7 @@ export default class IbisWorker extends EventEmitter{
       this._dpt._server.findneighbours(target, delve_id);
       var response: PeerInfo[] = await new Promise(resolve => this._dpt._server.on('peers', (peers) => resolve(peers)));
       console.log(chalk.magenta(`(ibis) `) + chalk.green(`received `) + response.length + chalk.green(` neighbours`));
-      
+
       for(let entry of response) {
         if(target.address && entry.address) this.addEdge(target.address, entry.address);
       }
@@ -176,33 +228,33 @@ export default class IbisWorker extends EventEmitter{
       //wait
       await this.delay(500);
     }
-    
 
-
-  
     return;
   }
 
 
-  
+
   /**
    * Generates an array of node ids where the index in the array
    * corresponds to the LOGICAL_DISTANCE from the target node id.
    * For example, result[1] represents a difference at the 1st bit
-   * 
+   *
    * Note: computations use the keccak256 hash of the 512-bit public key
    * @param target target node id
    */
   generateDistanceIds(target: Buffer): Buffer[] {
+    console.log(chalk.grey('calculating distance ids, this may take a while...'))
     let start_time = new Date().getTime();
 
     let arr = new Array<Buffer>(255);
     let hash = keccak256(target)
     let count = 0;
     let success = 0
-
+    //limit should be 255
+    let limit = 10
     while(true) {
-      if (success > 254) break;
+      if (success > limit) break;
+      console.log(success + "/" + limit)
       let randomId = randomBytes(32)
       let logicalDistance = this.calculateLogicalDistance(hash, keccak256(randomId));
 
@@ -210,7 +262,7 @@ export default class IbisWorker extends EventEmitter{
         arr[logicalDistance] = randomId
         success += 1
       }
-        
+
       count += 1;
     }
 
@@ -228,7 +280,7 @@ export default class IbisWorker extends EventEmitter{
 }
 
 
-  // - - - 
+  // - - -
 
   addEdge(src: string, dst: string) {
     if(src == dst) return;
@@ -268,7 +320,7 @@ export default class IbisWorker extends EventEmitter{
     /* Node Map */
 
     // const peers = dpt.getPeers()
-  
+
     // for(const peer of peers) {
     //   let delve_ids = generateDistanceIds(peer.id as Buffer);
 
@@ -299,7 +351,7 @@ export default class IbisWorker extends EventEmitter{
       case '1':
         return new Promise(resolve => resolve(this.delve_menu()));
       case '2':
-        break;
+        return new Promise(resolve => resolve(this.ttx_menu()));
       default:
         console.log(chalk.red('invalid selection'));
     }
@@ -310,6 +362,7 @@ export default class IbisWorker extends EventEmitter{
 
   print_status() {
     console.log(chalk.bgCyan("(ibis status)"))
+    console.log(chalk.grey("Node Address: ") + chalk.magenta(this._address.toString()));
     console.log(chalk.grey("RLPx peers: ") + chalk.cyan(this._rlpx.getPeers().length.toString()));
     console.log(chalk.grey("DPT peers: ") + chalk.cyan(this._dpt.getPeers().length.toString()));
     console.log(chalk.grey("Graph size: ") + chalk.cyan(this._map.size.toString()));
@@ -322,12 +375,9 @@ export default class IbisWorker extends EventEmitter{
 
 }
 
-  
 
-  
 
-  
-  
+
 /* Utility Functions */
 
 /**
@@ -350,40 +400,40 @@ function bin2hex(bin: string){
 
 
 
-  
+
 
 
   /**
    * Sends a GET_RECEIPTS eth message to a target,
    * returning the Receipt object
-   * @param target 
+   * @param target
    */
   // async function getReceipt(peer: Peer) {
   //   console.log("\n |-- RECEIPT METHOD --| \n")
   //   const eth = peer.getProtocols()[0]
-  
+
   //   /* Create a Tagged Transaction */
   //   let payload = "abc"
   //   eth.sendMessage(devp2p.ETH.MESSAGE_CODES.TX, payload)
   //   console.log("...sent Tagged Transaction\n")
-  
-  
+
+
   //   /* Send a GET_RECEIPTS message */
   //   let block_hashes = "0xfd"
   //   eth.sendMessage(devp2p.ETH.MESSAGE_CODES.GET_RECEIPTS, block_hashes)
   //   console.log("...sent GET_RECEIPTS\n")
-  
+
   //   var x = await new Promise(resolve => rlpx._server.on('message', (code, payload) =>  {
   //     if(code == devp2p.ETH.MESSAGE_CODES.RECEIPTS) {
   //       console.log("*** RECEIVED RECEIPT ***");
   //       resolve(payload);
   //     }
-  
+
   //     console.log(x);
   //     console.log(`
-  //     +:+:+:+:+:+:+ +:+:+:+:+:+:+ +:+:+:+:+:+:+ +:+:+:+:+:+:+ 
+  //     +:+:+:+:+:+:+ +:+:+:+:+:+:+ +:+:+:+:+:+:+ +:+:+:+:+:+:+
   //     `)
   //   }));
 
-  
+
   // }

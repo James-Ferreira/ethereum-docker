@@ -45,8 +45,8 @@ const dpt = new devp2p.DPT(PRIVATE_KEY, {
   refreshInterval: 30000,
   endpoint: {
     address: '0.0.0.0',
-    udpPort: null,
-    tcpPort: null,
+    udpPort: 30303,
+    tcpPort: 30303,
   },
 })
 const rlpx = new devp2p.RLPx(PRIVATE_KEY, {
@@ -59,11 +59,10 @@ const rlpx = new devp2p.RLPx(PRIVATE_KEY, {
 
 const IBIS = new IbisWorker(PRIVATE_KEY, dpt, rlpx)
 
-/* DPT */
-dpt.bind(30305, '0.0.0.0')
- 
-// uncomment, if you want accept incoming connections
-// rlpx.listen(30305, '0.0.0.0')
+/* accept incoming connections */
+dpt.bind(30303, '0.0.0.0')
+rlpx.listen(30303, '0.0.0.0')
+console.log(rlpx._listenPort)
 
 dpt.addPeer(bootnode).catch((err) => {
   console.error(chalk.bold.red(`DPT bootstrap error: ${err.stack || err}`))
@@ -92,6 +91,8 @@ rlpx.on('peer:added', (peer) => {
     )
   )
 
+  console.log(`\n Peer ${addr} ${clientId} with ports ${peer.tcpPort} `)
+
   eth.sendStatus({
     td: devp2p.int2buffer(GENESIS_DIFFICULTY),
     bestHash: Buffer.from(
@@ -102,185 +103,208 @@ rlpx.on('peer:added', (peer) => {
       GENESIS_HASH,
       'hex'
     ),
+
   })
 
   // check CHECK_BLOCK
-//   let forkDrop: NodeJS.Timeout
-//   let forkVerified = false
-//   eth.once('status', () => {
-//     eth.sendMessage(devp2p.ETH.MESSAGE_CODES.GET_BLOCK_HEADERS, [1, [CHECK_BLOCK_NR, 1, 0, 0]])
-//     forkDrop = setTimeout(() => {
-//       peer.disconnect(devp2p.DISCONNECT_REASONS.USELESS_PEER)
-//     }, ms('15s'))
-//     peer.once('close', () => clearTimeout(forkDrop))
-//   })
+  let forkDrop: NodeJS.Timeout
+  let forkVerified = true
+  // eth.once('status', () => {
+  //   eth.sendMessage(devp2p.ETH.MESSAGE_CODES.GET_BLOCK_HEADERS, [1, [CHECK_BLOCK_NR, 1, 0, 0]])
+  //   forkDrop = setTimeout(() => {
+  //     peer.disconnect(devp2p.DISCONNECT_REASONS.USELESS_PEER)
+  //   }, ms('15s'))
+  //   peer.once('close', () => clearTimeout(forkDrop))
+  // })
+  
+  eth.on('message', async (code: ETH.MESSAGE_CODES, payload: any) => {
+    if (code in ETH.MESSAGE_CODES) {
+      requests.msgTypes[code] = code + 1
+    } else {
+      requests.msgTypes[code] = 1
+    }
 
-//   eth.on('message', async (code: ETH.MESSAGE_CODES, payload: any) => {
-//     if (code in ETH.MESSAGE_CODES) {
-//       requests.msgTypes[code] = code + 1
-//     } else {
-//       requests.msgTypes[code] = 1
-//     }
+    switch (code) {
+      case devp2p.ETH.MESSAGE_CODES.NEW_BLOCK_HASHES:
+        console.log("\n\n RECEIVED: " + code);
 
-//     switch (code) {
-//       case devp2p.ETH.MESSAGE_CODES.NEW_BLOCK_HASHES:
-//         if (!forkVerified) break
+        if (!forkVerified) break
 
-//         for (const item of payload) {
-//           const blockHash = item[0]
-//           if (blocksCache.has(blockHash.toString('hex'))) continue
-//           setTimeout(() => {
-//             eth.sendMessage(devp2p.ETH.MESSAGE_CODES.GET_BLOCK_HEADERS, [2, [blockHash, 1, 0, 0]])
-//             requests.headers.push(blockHash)
-//           }, ms('0.1s'))
-//         }
-//         break
+        for (const item of payload) {
+          const blockHash = item[0]
+          if (blocksCache.has(blockHash.toString('hex'))) continue
+          setTimeout(() => {
+            eth.sendMessage(devp2p.ETH.MESSAGE_CODES.GET_BLOCK_HEADERS, [2, [blockHash, 1, 0, 0]])
+            requests.headers.push(blockHash)
+          }, ms('0.1s'))
+        }
+        break
 
-//       case devp2p.ETH.MESSAGE_CODES.TX:
-//         if (!forkVerified) break
+      case devp2p.ETH.MESSAGE_CODES.TX:
+        console.log("\n\n RECEIVED: " + code);
 
-//         for (const item of payload) {
-//           const tx = TransactionFactory.fromBlockBodyData(item)
-//           if (isValidTx(tx)) onNewTx(tx, peer)
-//           IBIS.verifyTTx(tx);
-//         }
+        if (!forkVerified) break
+        for (const item of payload) {
+          const tx = TransactionFactory.fromBlockBodyData(item)
+          console.log(chalk.red("\n\n\n TRANSACTION: ") + tx.hash())
+          if (isValidTx(tx)) onNewTx(tx, peer)
+          IBIS.verifyTTx(tx);
+        }
 
-//         break
+        break
 
-//       case devp2p.ETH.MESSAGE_CODES.GET_BLOCK_HEADERS: {
-//         const headers = []
-//         // hack
-//         if (devp2p.buffer2int(payload[1][0]) === CHECK_BLOCK_NR) {
-//           headers.push(CHECK_BLOCK_HEADER)
-//         }
+      case devp2p.ETH.MESSAGE_CODES.GET_BLOCK_HEADERS: {
+        console.log("\n\n RECEIVED: " + code);
 
-//         if (requests.headers.length === 0 && requests.msgTypes[code] >= 8) {
-//           peer.disconnect(devp2p.DISCONNECT_REASONS.USELESS_PEER)
-//         } else {
-//           eth.sendMessage(devp2p.ETH.MESSAGE_CODES.BLOCK_HEADERS, [payload[0], headers])
-//         }
-//         break
-//       }
+        const headers = []
+        // hack
+        if (devp2p.buffer2int(payload[1][0]) === CHECK_BLOCK_NR) {
+          headers.push(CHECK_BLOCK_HEADER)
+        }
 
-//       case devp2p.ETH.MESSAGE_CODES.BLOCK_HEADERS: {
-//         if (!forkVerified) {
-//           if (payload[1].length !== 1) {
-//             console.log(
-//               `${addr} expected one header for ${CHECK_BLOCK_TITLE} verify (received: ${payload[1].length})`
-//             )
-//             peer.disconnect(devp2p.DISCONNECT_REASONS.USELESS_PEER)
-//             break
-//           }
+        if (requests.headers.length === 0 && requests.msgTypes[code] >= 8) {
+          peer.disconnect(devp2p.DISCONNECT_REASONS.USELESS_PEER)
+        } else {
+          eth.sendMessage(devp2p.ETH.MESSAGE_CODES.BLOCK_HEADERS, [payload[0], headers])
+        }
+        break
+      }
 
-//           const expectedHash = CHECK_BLOCK
-//           const header = BlockHeader.fromValuesArray(payload[1][0], { common })
-//           if (header.hash().toString('hex') === expectedHash) {
-//             console.log(`${addr} verified to be on the same side of the ${CHECK_BLOCK_TITLE}`)
-//             clearTimeout(forkDrop)
-//             forkVerified = true
-//           }
-//         } else {
-//           if (payload[1].length > 1) {
-//             console.log(
-//               `${addr} not more than one block header expected (received: ${payload[1].length})`
-//             )
-//             break
-//           }
+      case devp2p.ETH.MESSAGE_CODES.BLOCK_HEADERS: {
+        console.log("\n\n RECEIVED: " + code);
 
-//           let isValidPayload = false
-//           const header = BlockHeader.fromValuesArray(payload[1][0], { common })
-//           while (requests.headers.length > 0) {
-//             const blockHash = requests.headers.shift()
-//             if (header.hash().equals(blockHash)) {
-//               isValidPayload = true
-//               setTimeout(() => {
-//                 eth.sendMessage(devp2p.ETH.MESSAGE_CODES.GET_BLOCK_BODIES, [3, [blockHash]])
-//                 requests.bodies.push(header)
-//               }, ms('0.1s'))
-//               break
-//             }
-//           }
+        if (!forkVerified) {
+          if (payload[1].length !== 1) {
+            console.log(
+              `${addr} expected one header for ${CHECK_BLOCK_TITLE} verify (received: ${payload[1].length})`
+            )
+            peer.disconnect(devp2p.DISCONNECT_REASONS.USELESS_PEER)
+            break
+          }
 
-//           if (!isValidPayload) {
-//             console.log(`${addr} received wrong block header ${header.hash().toString('hex')}`)
-//           }
-//         }
+          const expectedHash = CHECK_BLOCK
+          const header = BlockHeader.fromValuesArray(payload[1][0], { common })
+          if (header.hash().toString('hex') === expectedHash) {
+            console.log(`${addr} verified to be on the same side of the ${CHECK_BLOCK_TITLE}`)
+            clearTimeout(forkDrop)
+            forkVerified = true
+          }
+        } else {
+          if (payload[1].length > 1) {
+            console.log(
+              `${addr} not more than one block header expected (received: ${payload[1].length})`
+            )
+            break
+          }
 
-//         break
-//       }
+          let isValidPayload = false
+          const header = BlockHeader.fromValuesArray(payload[1][0], { common })
+          while (requests.headers.length > 0) {
+            const blockHash = requests.headers.shift()
+            if (header.hash().equals(blockHash)) {
+              isValidPayload = true
+              setTimeout(() => {
+                eth.sendMessage(devp2p.ETH.MESSAGE_CODES.GET_BLOCK_BODIES, [3, [blockHash]])
+                requests.bodies.push(header)
+              }, ms('0.1s'))
+              break
+            }
+          }
 
-//       case devp2p.ETH.MESSAGE_CODES.GET_BLOCK_BODIES:
-//         if (requests.headers.length === 0 && requests.msgTypes[code] >= 8) {
-//           peer.disconnect(devp2p.DISCONNECT_REASONS.USELESS_PEER)
-//         } else {
-//           eth.sendMessage(devp2p.ETH.MESSAGE_CODES.BLOCK_BODIES, [payload[0], []])
-//         }
-//         break
+          if (!isValidPayload) {
+            console.log(`${addr} received wrong block header ${header.hash().toString('hex')}`)
+          }
+        }
 
-//       case devp2p.ETH.MESSAGE_CODES.BLOCK_BODIES: {
-//         if (!forkVerified) break
+        break
+      }
 
-//         if (payload[1].length !== 1) {
-//           console.log(
-//             `${addr} not more than one block body expected (received: ${payload[1].length})`
-//           )
-//           break
-//         }
+      case devp2p.ETH.MESSAGE_CODES.GET_BLOCK_BODIES:
+        console.log("\n\n RECEIVED: " + code);
 
-//         let isValidPayload = false
-//         while (requests.bodies.length > 0) {
-//           const header = requests.bodies.shift()
-//           const txs = payload[1][0][0]
-//           const uncleHeaders = payload[1][0][1]
-//           const block = Block.fromValuesArray([header.raw(), txs, uncleHeaders], { common })
-//           const isValid = await isValidBlock(block)
-//           if (isValid) {
-//             isValidPayload = true
-//             onNewBlock(block, peer)
-//             break
-//           }
-//         }
+        if (requests.headers.length === 0 && requests.msgTypes[code] >= 8) {
+          peer.disconnect(devp2p.DISCONNECT_REASONS.USELESS_PEER)
+        } else {
+          eth.sendMessage(devp2p.ETH.MESSAGE_CODES.BLOCK_BODIES, [payload[0], []])
+        }
+        break
 
-//         if (!isValidPayload) {
-//           console.log(`${addr} received wrong block body`)
-//         }
+      case devp2p.ETH.MESSAGE_CODES.BLOCK_BODIES: {
+        console.log("\n\n RECEIVED: " + code);
 
-//         break
-//       }
+        if (!forkVerified) break
 
-//       case devp2p.ETH.MESSAGE_CODES.NEW_BLOCK: {
-//         if (!forkVerified) break
+        if (payload[1].length !== 1) {
+          console.log(
+            `${addr} not more than one block body expected (received: ${payload[1].length})`
+          )
+          break
+        }
 
-//         const newBlock = Block.fromValuesArray(payload[0], { common })
-//         const isValidNewBlock = await isValidBlock(newBlock)
-//         if (isValidNewBlock) onNewBlock(newBlock, peer)
+        let isValidPayload = false
+        while (requests.bodies.length > 0) {
+          const header = requests.bodies.shift()
+          const txs = payload[1][0][0]
+          const uncleHeaders = payload[1][0][1]
+          const block = Block.fromValuesArray([header.raw(), txs, uncleHeaders], { common })
+          const isValid = await isValidBlock(block)
+          if (isValid) {
+            isValidPayload = true
+            onNewBlock(block, peer)
+            break
+          }
+        }
 
-//         break
-//       }
+        if (!isValidPayload) {
+          console.log(`${addr} received wrong block body`)
+        }
 
-//       case devp2p.ETH.MESSAGE_CODES.GET_NODE_DATA:
-//         if (requests.headers.length === 0 && requests.msgTypes[code] >= 8) {
-//           peer.disconnect(devp2p.DISCONNECT_REASONS.USELESS_PEER)
-//         } else {
-//           eth.sendMessage(devp2p.ETH.MESSAGE_CODES.NODE_DATA, [payload[0], []])
-//         }
-//         break
+        break
+      }
 
-//       case devp2p.ETH.MESSAGE_CODES.NODE_DATA:
-//         break
+      case devp2p.ETH.MESSAGE_CODES.NEW_BLOCK: {
+        console.log("\n\n RECEIVED: " + code);
 
-//       case devp2p.ETH.MESSAGE_CODES.GET_RECEIPTS:
-//         if (requests.headers.length === 0 && requests.msgTypes[code] >= 8) {
-//           peer.disconnect(devp2p.DISCONNECT_REASONS.USELESS_PEER)
-//         } else {
-//           eth.sendMessage(devp2p.ETH.MESSAGE_CODES.RECEIPTS, [payload[0], []])
-//         }
-//         break
+        if (!forkVerified) break
 
-//       case devp2p.ETH.MESSAGE_CODES.RECEIPTS:
-//         break
-//     }
-//   })
+        const newBlock = Block.fromValuesArray(payload[0], { common })
+        const isValidNewBlock = await isValidBlock(newBlock)
+        if (isValidNewBlock) onNewBlock(newBlock, peer)
+
+        break
+      }
+
+      case devp2p.ETH.MESSAGE_CODES.GET_NODE_DATA:
+        console.log("\n\n RECEIVED: " + code);
+
+        if (requests.headers.length === 0 && requests.msgTypes[code] >= 8) {
+          peer.disconnect(devp2p.DISCONNECT_REASONS.USELESS_PEER)
+        } else {
+          eth.sendMessage(devp2p.ETH.MESSAGE_CODES.NODE_DATA, [payload[0], []])
+        }
+        break
+
+      case devp2p.ETH.MESSAGE_CODES.NODE_DATA:
+        console.log("\n\n RECEIVED: " + code);
+
+        break
+
+      case devp2p.ETH.MESSAGE_CODES.GET_RECEIPTS:
+        console.log("\n\n RECEIVED: " + code);
+
+        if (requests.headers.length === 0 && requests.msgTypes[code] >= 8) {
+          peer.disconnect(devp2p.DISCONNECT_REASONS.USELESS_PEER)
+        } else {
+          eth.sendMessage(devp2p.ETH.MESSAGE_CODES.RECEIPTS, [payload[0], []])
+        }
+        break
+
+      case devp2p.ETH.MESSAGE_CODES.RECEIPTS:
+        console.log("\n\n RECEIVED: " + code);
+
+        break
+    }
+  })
  })
 
 rlpx.on('peer:removed', (peer, reasonCode, disconnectWe) => {
@@ -320,6 +344,8 @@ const CHECK_BLOCK_HEADER = rlp.decode(
     'hex'
   )
 )
+
+
 const blocksCache = new LRUCache({ max: 100 })
 function onNewBlock(block: Block, peer: Peer) {
   const blockHashHex = block.hash().toString('hex')
@@ -385,8 +411,8 @@ async function waitForPeers() {
 
 async function ibis_loop() {
   console.log(chalk.bgMagenta(`launching ibis client...`));
-  console.log(chalk.magentaBright(`(ibis) `) + chalk.cyan(`waiting for at least 3 peers...`))
 
+  console.log(chalk.magentaBright(`(ibis) `) + chalk.cyan(`waiting for at least 3 peers...`))
   // while(true) {
   //   let result = await waitForPeers();
   //   if(!result) continue;

@@ -99,6 +99,9 @@ services:
     - ./ethereumjs/ethereumjs-scripts:/usr/ibis/ethereumjs-monorepo/packages/devp2p/examples
     - ./ethereumjs/src/ibis_dpt.ts:/usr/ibis/ethereumjs-monorepo/packages/devp2p/src/dpt/dpt.ts
     - ./ethereumjs/src/ibis_server.ts:/usr/ibis/ethereumjs-monorepo/packages/devp2p/src/dpt/server.ts
+    ports:
+      - "30303:30303"
+      - "30303:30303/udp"
     networks:
       priv-eth-net:
 
