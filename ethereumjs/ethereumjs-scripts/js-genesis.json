@@ -74,6 +74,16 @@
             "name": "istanbul",
             "block": 0,
             "forkHash": null
+          },
+          {
+            "name": "berlin",
+            "block": 0,
+            "forkHash": null
+          },
+          {
+            "name": "london",
+            "block": 0,
+            "forkHash": null
           }
       ]
   }

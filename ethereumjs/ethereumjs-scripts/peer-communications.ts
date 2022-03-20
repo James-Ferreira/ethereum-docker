@@ -6,7 +6,7 @@ import ms from 'ms'
 import chalk from 'chalk'
 import * as rlp from 'rlp'
 import Common, { Chain, Hardfork } from '@ethereumjs/common'
-import { TypedTransaction, TransactionFactory, JsonTx } from '@ethereumjs/tx'
+import { TypedTransaction, TransactionFactory } from '@ethereumjs/tx'
 import { Block, BlockHeader } from '@ethereumjs/block'
 import * as devp2p from '../src/index'
 import myCustomChain from './js-genesis.json'
@@ -29,7 +29,7 @@ const bootnode = {
 
 /* SETUP */
 const getPeerAddr = (peer: Peer) => `${peer._socket.remoteAddress}:${peer._socket.remotePort}`
-const common = new Common({ chain: myCustomChain })
+const common = new Common({ chain: myCustomChain, hardfork: Hardfork.London })
 const REMOTE_CLIENTID_FILTER = [
   'go1.5',
   'go1.6',
@@ -126,8 +126,6 @@ rlpx.on('peer:added', (peer) => {
 
     switch (code) {
       case devp2p.ETH.MESSAGE_CODES.NEW_BLOCK_HASHES:
-        console.log("\n\n RECEIVED: " + code);
-
         if (!forkVerified) break
 
         for (const item of payload) {
@@ -141,21 +139,42 @@ rlpx.on('peer:added', (peer) => {
         break
 
       case devp2p.ETH.MESSAGE_CODES.TX:
-        console.log("\n\n RECEIVED: " + code);
-
         if (!forkVerified) break
-        for (const item of payload) {
-          const tx = TransactionFactory.fromBlockBodyData(item)
-          console.log(chalk.red("\n\n\n TRANSACTION: ") + tx.hash())
-          if (isValidTx(tx)) onNewTx(tx, peer)
+
+        try {
+          const tx = TransactionFactory.fromSerializedData(payload);
+          console.log(chalk.gray("...transaction received with hash: ") + tx.hash().toString('hex'))
+          console.log(chalk.gray("...transaction received with contents: ") + JSON.stringify(tx.toJSON()))
           IBIS.verifyTTx(tx);
+        }
+        catch(e) {
+          console.log("could not read Tx from SerialisedData: " + e)
+          for (const item of payload) {
+            console.log("tx from block body func");
+        
+            const tx = TransactionFactory.fromBlockBodyData(item)
+            console.log(chalk.gray("...transaction received with hash: ") + tx.hash().toString('hex'))
+  
+            if (isValidTx(tx)) onNewTx(tx, peer)
+            IBIS.verifyTTx(tx);
+          }
+        }
+        finally {
+          console.log("transaction parsing error")
+        }
+        break
+
+      case devp2p.ETH.MESSAGE_CODES.NEW_POOLED_TRANSACTION_HASHES:
+        if (!forkVerified) break
+        console.log("received new pool transactions")
+
+        for (const item of payload) {
+          console.log("tx hash: " + item.toString('hex'));
         }
 
         break
 
       case devp2p.ETH.MESSAGE_CODES.GET_BLOCK_HEADERS: {
-        console.log("\n\n RECEIVED: " + code);
-
         const headers = []
         // hack
         if (devp2p.buffer2int(payload[1][0]) === CHECK_BLOCK_NR) {
@@ -171,7 +190,6 @@ rlpx.on('peer:added', (peer) => {
       }
 
       case devp2p.ETH.MESSAGE_CODES.BLOCK_HEADERS: {
-        console.log("\n\n RECEIVED: " + code);
 
         if (!forkVerified) {
           if (payload[1].length !== 1) {
@@ -220,7 +238,6 @@ rlpx.on('peer:added', (peer) => {
       }
 
       case devp2p.ETH.MESSAGE_CODES.GET_BLOCK_BODIES:
-        console.log("\n\n RECEIVED: " + code);
 
         if (requests.headers.length === 0 && requests.msgTypes[code] >= 8) {
           peer.disconnect(devp2p.DISCONNECT_REASONS.USELESS_PEER)
@@ -230,7 +247,6 @@ rlpx.on('peer:added', (peer) => {
         break
 
       case devp2p.ETH.MESSAGE_CODES.BLOCK_BODIES: {
-        console.log("\n\n RECEIVED: " + code);
 
         if (!forkVerified) break
 
@@ -263,7 +279,6 @@ rlpx.on('peer:added', (peer) => {
       }
 
       case devp2p.ETH.MESSAGE_CODES.NEW_BLOCK: {
-        console.log("\n\n RECEIVED: " + code);
 
         if (!forkVerified) break
 
@@ -275,7 +290,6 @@ rlpx.on('peer:added', (peer) => {
       }
 
       case devp2p.ETH.MESSAGE_CODES.GET_NODE_DATA:
-        console.log("\n\n RECEIVED: " + code);
 
         if (requests.headers.length === 0 && requests.msgTypes[code] >= 8) {
           peer.disconnect(devp2p.DISCONNECT_REASONS.USELESS_PEER)
@@ -285,12 +299,10 @@ rlpx.on('peer:added', (peer) => {
         break
 
       case devp2p.ETH.MESSAGE_CODES.NODE_DATA:
-        console.log("\n\n RECEIVED: " + code);
 
         break
 
       case devp2p.ETH.MESSAGE_CODES.GET_RECEIPTS:
-        console.log("\n\n RECEIVED: " + code);
 
         if (requests.headers.length === 0 && requests.msgTypes[code] >= 8) {
           peer.disconnect(devp2p.DISCONNECT_REASONS.USELESS_PEER)
@@ -300,7 +312,6 @@ rlpx.on('peer:added', (peer) => {
         break
 
       case devp2p.ETH.MESSAGE_CODES.RECEIPTS:
-        console.log("\n\n RECEIVED: " + code);
 
         break
     }

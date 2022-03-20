@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events'
 import ms from 'ms'
 import chalk from 'chalk'
-import { TypedTransaction, TransactionFactory, JsonTx } from '@ethereumjs/tx'
+import { TypedTransaction, TransactionFactory, Transaction, JsonTx, FeeMarketEIP1559Transaction } from '@ethereumjs/tx'
 import * as devp2p from '../src/index'
 import { randomBytes } from 'crypto'
 
@@ -13,8 +13,13 @@ import { Address } from 'ethereumjs-util'
 import * as readline from 'readline';
 import { stdin as input, stdout as output } from 'node:process';
 
+/* Chain */
+import Common, { Chain, Hardfork } from '@ethereumjs/common'
+import myCustomChain from './js-genesis.json'
+
 type NodeType = { id: string, lastSeen: string}
 type Record = {id: string, lastSeen: string}
+const CHAIN_ID =  0x189f624f;
 
 export default class IbisWorker extends EventEmitter{
     _private_key: Buffer
@@ -80,24 +85,36 @@ export default class IbisWorker extends EventEmitter{
     });
   }
 
-
   /**
    * Creates an IBIS 'Tagged Transaction', sends the message to a specified
    * Peer and returns the Transaction hash
    */
    createTTx() {
-
-    const tx = TransactionFactory.fromTxData({
+     const common = new Common({ chain: myCustomChain, hardfork: Hardfork.London })
+     let txData = {
       nonce: 0,
       gasPrice: 100,
       gasLimit: 1000000000,
       value: 0,
-      data:
-        '0x7f4e616d65526567000000000000000000000000000000000000000000000000003057307f4e616d6552656700000000000000000000000000000000000000000000000000573360455760415160566000396000f20036602259604556330e0f600f5933ff33560f601e5960003356576000335700604158600035560f602b590033560f60365960003356573360003557600035335700',
-    })
+      data: randomBytes(8),
+    }
+
+    // let txData = {
+    //   "chainId": CHAIN_ID,
+    //   "nonce": "0x00",
+    //   "maxPriorityFeePerGas": "0x01",
+    //   "maxFeePerGas": "0xff",
+    //   "gasLimit": "0x02625a00",
+    //   "to": "0xcccccccccccccccccccccccccccccccccccccccc",
+    //   "value": "0x0186a0",
+    //   "data": "0x1a8451e600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    //   "accessList": [],
+    //   "type": "0x02"
+    // }
+
+    const tx = TransactionFactory.fromTxData(txData, { common })
 
     const signedTx = tx.sign(this._private_key)
-
 
     if (signedTx.validate() && signedTx.getSenderAddress().equals(this._address)) {
       console.log('Valid signature')
@@ -121,32 +138,17 @@ export default class IbisWorker extends EventEmitter{
       console.log(chalk.gray(`...sending ttx with hash `), txHash);
 
       if(eth instanceof devp2p.ETH) {
-        (eth as devp2p.ETH).sendMessage(devp2p.ETH.MESSAGE_CODES.TX, ttx.serialize().toString('hex'))
-          console.log(chalk.green(` sent ttx...`));
+        (eth as devp2p.ETH).sendMessage(devp2p.ETH.MESSAGE_CODES.TX, ttx.serialize());
+          console.log(chalk.green(`sent ttx <3`));
       } else {
         console.log(chalk.gray(`...peer using LES protocol, ttx not sent`))
       }
-
-      console.log("waiting on ttx response...")
-
-      // wait for ttx to return
-      //todo: add a timeout
-      var response = await new Promise(resolve =>
-        eth.on('message', async (code: ETH.MESSAGE_CODES, payload: any) => {
-          console.log(chalk.magenta(`(ibis)`) + chalk.green(` received msg w/ code: `) + code);
-          if(code == devp2p.ETH.MESSAGE_CODES.TX) {
-            console.log(chalk.magenta(`(ibis)`) + chalk.green(` received tx...`));
-          }
-          resolve(payload)}
-        ));
-
-      console.log("ttx response: " + response);
       this._ttx_hashes.add(txHash)
+      console.log(chalk.green(`...now tracking ${this._ttx_hashes.size} TTx's...`));
+
       } catch(e){
         console.log(e);
       }
-
-
 
   }
 
