@@ -13,7 +13,7 @@
     "londonBlock": 0,
     "ethash": {}
   },
-  "difficulty": "0x1",
+  "difficulty": "0x77777",
   "gasLimit": "0xB71B00",
   "alloc": {
     "0x21a3c1c42345f90fab2274c5a88780a9a76075da": {
@@ -23,6 +23,9 @@
       "balance": "0x1158E460913D00000"
     },
     "0xd34167529aaca8114e578b91193c4ef8bead56fe": {
+      "balance": "0x1158E460913D00000"
+    },
+    "0x82d4b1c01afaf7f25bb21fd0b4b4c4a7eb7120ce": {
       "balance": "0x1158E460913D00000"
     }
   }

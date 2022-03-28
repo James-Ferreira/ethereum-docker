@@ -10,10 +10,10 @@
     "comment": "The IBIS Docker Testbed",
   
     "genesis": {
-      "hash": "0xdfaa0648072fdf12cdeda5f09be19948b97b66733af7cb69a469000b5766328e",
+      "hash": "0x98a440ae7d107996b4a68e08e54b36acaefb63e66dcbabfe115618116713f4cb",
       "timestamp": 0,
       "gasLimit": 12000000,
-      "difficulty": 1,
+      "difficulty": "0x77777",
       "nonce": "0x0000000000000000",
       "extraData": "0x",
       "stateRoot": "0x2c689e92624a5a8f6d043be49739e02e1a49422af9b0b3e27427f1a85724285f"

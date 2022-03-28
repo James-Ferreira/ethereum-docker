@@ -17,9 +17,9 @@ import { PeerInfo, xor, ETH, Peer } from '@ethereumjs/devp2p'
 import { buffer2int } from '@ethereumjs/devp2p'
 import { Address } from 'ethereumjs-util'
 
-const PRIVATE_KEY = randomBytes(32)
-var GENESIS_DIFFICULTY = 1; 
-var GENESIS_HASH = "dfaa0648072fdf12cdeda5f09be19948b97b66733af7cb69a469000b5766328e";
+const PRIVATE_KEY = Buffer.from("133965f412d1362645cbd963619023585abc8765c7372ed238374acb884b2b3a", 'hex')
+var GENESIS_DIFFICULTY = 0x77777; 
+var GENESIS_HASH = "98a440ae7d107996b4a68e08e54b36acaefb63e66dcbabfe115618116713f4cb";
 var IBIS_BOOTNODE_IP = "172.16.254.62";
 const bootnode = {
   address: IBIS_BOOTNODE_IP,
@@ -29,7 +29,7 @@ const bootnode = {
 
 /* SETUP */
 const getPeerAddr = (peer: Peer) => `${peer._socket.remoteAddress}:${peer._socket.remotePort}`
-const common = new Common({ chain: myCustomChain, hardfork: Hardfork.London })
+const common = new Common({ chain: myCustomChain, hardfork: Hardfork.London})
 const REMOTE_CLIENTID_FILTER = [
   'go1.5',
   'go1.6',
@@ -45,8 +45,8 @@ const dpt = new devp2p.DPT(PRIVATE_KEY, {
   refreshInterval: 30000,
   endpoint: {
     address: '0.0.0.0',
-    udpPort: 30303,
-    tcpPort: 30303,
+    udpPort: null,
+    tcpPort: null,
   },
 })
 const rlpx = new devp2p.RLPx(PRIVATE_KEY, {
@@ -62,7 +62,6 @@ const IBIS = new IbisWorker(PRIVATE_KEY, dpt, rlpx)
 /* accept incoming connections */
 dpt.bind(30303, '0.0.0.0')
 rlpx.listen(30303, '0.0.0.0')
-console.log(rlpx._listenPort)
 
 dpt.addPeer(bootnode).catch((err) => {
   console.error(chalk.bold.red(`DPT bootstrap error: ${err.stack || err}`))
@@ -112,6 +111,7 @@ rlpx.on('peer:added', (peer) => {
   // eth.once('status', () => {
   //   eth.sendMessage(devp2p.ETH.MESSAGE_CODES.GET_BLOCK_HEADERS, [1, [CHECK_BLOCK_NR, 1, 0, 0]])
   //   forkDrop = setTimeout(() => {
+  //     console.log(chalk.red("dropping due to fork timeout"))
   //     peer.disconnect(devp2p.DISCONNECT_REASONS.USELESS_PEER)
   //   }, ms('15s'))
   //   peer.once('close', () => clearTimeout(forkDrop))
@@ -144,23 +144,21 @@ rlpx.on('peer:added', (peer) => {
         try {
           const tx = TransactionFactory.fromSerializedData(payload);
           console.log(chalk.gray("...transaction received with hash: ") + tx.hash().toString('hex'))
-          console.log(chalk.gray("...transaction received with contents: ") + JSON.stringify(tx.toJSON()))
+          // console.log(chalk.gray("...transaction received with contents: ") + JSON.stringify(tx.toJSON()))
           IBIS.verifyTTx(tx);
         }
         catch(e) {
-          console.log("could not read Tx from SerialisedData: " + e)
+          console.log(chalk.gray("...attemping to parse tx from block body"));
           for (const item of payload) {
-            console.log("tx from block body func");
-        
             const tx = TransactionFactory.fromBlockBodyData(item)
             console.log(chalk.gray("...transaction received with hash: ") + tx.hash().toString('hex'))
-  
-            if (isValidTx(tx)) onNewTx(tx, peer)
+            // console.log(chalk.gray("...transaction received with contents: ") + JSON.stringify(tx.toJSON()))
+
             IBIS.verifyTTx(tx);
           }
         }
         finally {
-          console.log("transaction parsing error")
+          // console.log(chalk.red("...the transaction could not be parsed"))
         }
         break
 
@@ -191,48 +189,48 @@ rlpx.on('peer:added', (peer) => {
 
       case devp2p.ETH.MESSAGE_CODES.BLOCK_HEADERS: {
 
-        if (!forkVerified) {
-          if (payload[1].length !== 1) {
-            console.log(
-              `${addr} expected one header for ${CHECK_BLOCK_TITLE} verify (received: ${payload[1].length})`
-            )
-            peer.disconnect(devp2p.DISCONNECT_REASONS.USELESS_PEER)
-            break
-          }
+        // if (!forkVerified) {
+        //   if (payload[1].length !== 1) {
+        //     console.log(
+        //       `${addr} expected one header for ${CHECK_BLOCK_TITLE} verify (received: ${payload[1].length})`
+        //     )
+        //     peer.disconnect(devp2p.DISCONNECT_REASONS.USELESS_PEER)
+        //     break
+        //   }
 
-          const expectedHash = CHECK_BLOCK
-          const header = BlockHeader.fromValuesArray(payload[1][0], { common })
-          if (header.hash().toString('hex') === expectedHash) {
-            console.log(`${addr} verified to be on the same side of the ${CHECK_BLOCK_TITLE}`)
-            clearTimeout(forkDrop)
-            forkVerified = true
-          }
-        } else {
-          if (payload[1].length > 1) {
-            console.log(
-              `${addr} not more than one block header expected (received: ${payload[1].length})`
-            )
-            break
-          }
+        //   const expectedHash = CHECK_BLOCK
+        //   const header = BlockHeader.fromValuesArray(payload[1][0], { common })
+        //   if (header.hash().toString('hex') === expectedHash) {
+        //     console.log(`${addr} verified to be on the same side of the ${CHECK_BLOCK_TITLE}`)
+        //     clearTimeout(forkDrop)
+        //     forkVerified = true
+        //   }
+        // } else {
+        //   if (payload[1].length > 1) {
+        //     console.log(
+        //       `${addr} not more than one block header expected (received: ${payload[1].length})`
+        //     )
+        //     break
+        //   }
 
-          let isValidPayload = false
-          const header = BlockHeader.fromValuesArray(payload[1][0], { common })
-          while (requests.headers.length > 0) {
-            const blockHash = requests.headers.shift()
-            if (header.hash().equals(blockHash)) {
-              isValidPayload = true
-              setTimeout(() => {
-                eth.sendMessage(devp2p.ETH.MESSAGE_CODES.GET_BLOCK_BODIES, [3, [blockHash]])
-                requests.bodies.push(header)
-              }, ms('0.1s'))
-              break
-            }
-          }
+        //   let isValidPayload = false
+        //   const header = BlockHeader.fromValuesArray(payload[1][0], { common })
+        //   while (requests.headers.length > 0) {
+        //     const blockHash = requests.headers.shift()
+        //     if (header.hash().equals(blockHash)) {
+        //       isValidPayload = true
+        //       setTimeout(() => {
+        //         eth.sendMessage(devp2p.ETH.MESSAGE_CODES.GET_BLOCK_BODIES, [3, [blockHash]])
+        //         requests.bodies.push(header)
+        //       }, ms('0.1s'))
+        //       break
+        //     }
+        //   }
 
-          if (!isValidPayload) {
-            console.log(`${addr} received wrong block header ${header.hash().toString('hex')}`)
-          }
-        }
+        //   if (!isValidPayload) {
+        //     //console.log(`${addr} received wrong block header ${header.hash().toString('hex')}`)
+        //   }
+        // }
 
         break
       }
@@ -290,12 +288,16 @@ rlpx.on('peer:added', (peer) => {
       }
 
       case devp2p.ETH.MESSAGE_CODES.GET_NODE_DATA:
+        eth.sendMessage(devp2p.ETH.MESSAGE_CODES.NODE_DATA, [payload[0], []])
 
-        if (requests.headers.length === 0 && requests.msgTypes[code] >= 8) {
-          peer.disconnect(devp2p.DISCONNECT_REASONS.USELESS_PEER)
-        } else {
-          eth.sendMessage(devp2p.ETH.MESSAGE_CODES.NODE_DATA, [payload[0], []])
-        }
+        // if (requests.headers.length === 0 && requests.msgTypes[code] >= 8) {
+        //   console.log(chalk.red("\n\ndropping due to GET_NODE_DATA"))
+        //   console.log(requests)
+
+        //   peer.disconnect(devp2p.DISCONNECT_REASONS.USELESS_PEER)
+        // } else {
+        //   eth.sendMessage(devp2p.ETH.MESSAGE_CODES.NODE_DATA, [payload[0], []])
+        // }
         break
 
       case devp2p.ETH.MESSAGE_CODES.NODE_DATA:
@@ -346,8 +348,8 @@ rlpx.on('peer:error', (peer, err) => {
 
 /* Blocks */
 
-const CHECK_BLOCK_TITLE = 'Istanbul Fork' // Only for debugging/console output
-const CHECK_BLOCK_NR = 12244000
+const CHECK_BLOCK_TITLE = 'Custom Genesis' // Only for debugging/console output
+const CHECK_BLOCK_NR = 0
 const CHECK_BLOCK = GENESIS_HASH
 const CHECK_BLOCK_HEADER = rlp.decode(
   Buffer.from(
@@ -364,14 +366,14 @@ function onNewBlock(block: Block, peer: Peer) {
   if (blocksCache.has(blockHashHex)) return
 
   blocksCache.set(blockHashHex, true)
-  console.log(
-    `----------------------------------------------------------------------------------------------------------`
-  )
-  console.log(`New block ${blockNumber}: ${blockHashHex} (from ${getPeerAddr(peer)})`)
-  console.log(
-    `----------------------------------------------------------------------------------------------------------`
-  )
-  for (const tx of block.transactions) onNewTx(tx, peer)
+  // console.log(
+  //   `----------------------------------------------------------------------------------------------------------`
+  // )
+  // console.log(`New block ${blockNumber}: ${blockHashHex} (from ${getPeerAddr(peer)})`)
+  // console.log(
+  //   `----------------------------------------------------------------------------------------------------------`
+  // )
+  // for (const tx of block.transactions) onNewTx(tx, peer)
 }
 
 function isValidTx(tx: TypedTransaction) {
@@ -387,14 +389,17 @@ async function isValidBlock(block: Block) {
 }
 
 
-const txCache = new LRUCache({ max: 1000 })
-function onNewTx(tx: TypedTransaction, peer: Peer) {
-  const txHashHex = tx.hash().toString('hex')
-  if (txCache.has(txHashHex)) return
 
-  txCache.set(txHashHex, true)
-  console.log(`New tx: ${txHashHex} (from ${getPeerAddr(peer)})`)
-}
+
+
+// const txCache = new LRUCache({ max: 1000 })
+// function onNewTx(tx: TypedTransaction, peer: Peer) {
+//   const txHashHex = tx.hash().toString('hex')
+//   if (txCache.has(txHashHex)) return
+
+//   txCache.set(txHashHex, true)
+//   console.log(`New tx: ${txHashHex} (from ${getPeerAddr(peer)})`)
+// }
 
 
 // const peersCount = dpt.getPeers().length

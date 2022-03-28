@@ -12,7 +12,7 @@ import { Address } from 'ethereumjs-util'
 /* Terminal IO */
 import * as readline from 'readline';
 import { stdin as input, stdout as output } from 'node:process';
-
+import { rlp } from 'ethereumjs-util'
 /* Chain */
 import Common, { Chain, Hardfork } from '@ethereumjs/common'
 import myCustomChain from './js-genesis.json'
@@ -20,6 +20,7 @@ import myCustomChain from './js-genesis.json'
 type NodeType = { id: string, lastSeen: string}
 type Record = {id: string, lastSeen: string}
 const CHAIN_ID =  0x189f624f;
+const Web3 = require('web3')
 
 export default class IbisWorker extends EventEmitter{
     _private_key: Buffer
@@ -33,6 +34,7 @@ export default class IbisWorker extends EventEmitter{
     _map: Map<string, string>
     _rl: readline.Interface
     _active: boolean
+    _sent_tx: number
 
     constructor(private_key: Buffer, dpt: devp2p.DPT, rlpx: devp2p.RLPx) {
       super()
@@ -49,6 +51,7 @@ export default class IbisWorker extends EventEmitter{
         output: process.stdout
       });
       this._active = false;
+      this._sent_tx = 0;
 
     }
 
@@ -90,38 +93,66 @@ export default class IbisWorker extends EventEmitter{
    * Peer and returns the Transaction hash
    */
    createTTx() {
-     const common = new Common({ chain: myCustomChain, hardfork: Hardfork.London })
-     let txData = {
-      nonce: 0,
-      gasPrice: 100,
-      gasLimit: 1000000000,
-      value: 0,
-      data: randomBytes(8),
+     const common = new Common({ chain: myCustomChain, hardfork: Hardfork.London})
+
+     //eip-1558
+     const txData = {
+      data: randomBytes(3),
+      gasLimit: "0x124F80",
+      maxPriorityFeePerGas: "0x01",
+      maxFeePerGas: "0xff",
+      nonce: this._sent_tx,
+      to: "0xcccccccccccccccccccccccccccccccccccccccc",
+      value: "0x0186a0",
+      chainId: "0x189f624f",
+      accessList: [],
+      type: "0x02"
     }
 
-    // let txData = {
-    //   "chainId": CHAIN_ID,
-    //   "nonce": "0x00",
-    //   "maxPriorityFeePerGas": "0x01",
-    //   "maxFeePerGas": "0xff",
+    //eip-2930
+    // const txData = {
+    //   "data": "0x1a8451e600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
     //   "gasLimit": "0x02625a00",
+    //   "gasPrice": "0x01",
+    //   "nonce": "0x00",
     //   "to": "0xcccccccccccccccccccccccccccccccccccccccc",
     //   "value": "0x0186a0",
-    //   "data": "0x1a8451e600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-    //   "accessList": [],
-    //   "type": "0x02"
+    //   "v": "0x01",
+    //   "r": "0xafb6e247b1c490e284053c87ab5f6b59e219d51f743f7a4d83e400782bc7e4b9",
+    //   "s": "0x479a268e0e0acd4de3f1e28e4fac2a6b32a4195e8dfa9d19147abe8807aa6f64",
+    //   "chainId": CHAIN_ID,
+    //   "accessList": [
+    //     {
+    //       "address": "0x0000000000000000000000000000000000000101",
+    //       "storageKeys": [
+    //         "0x0000000000000000000000000000000000000000000000000000000000000000",
+    //         "0x00000000000000000000000000000000000000000000000000000000000060a7"
+    //       ]
+    //     }
+    //   ],
+    //   "type": "0x01"
     // }
 
+
+    //legacy (not supported)
+    // const txData = {
+    //   nonce: '0x00',
+    //   gasPrice: '0x09184e72a000',
+    //   gasLimit: '0x2710',
+    //   to: '0x0000000000000000000000000000000000000000',
+    //   value: '0x00',
+    //   data: '0x7f7465737432000000000000000000000000000000000000000000000000000000600057',
+    // }
     const tx = TransactionFactory.fromTxData(txData, { common })
 
     const signedTx = tx.sign(this._private_key)
 
     if (signedTx.validate() && signedTx.getSenderAddress().equals(this._address)) {
-      console.log('Valid signature')
+      console.log(chalk.green('...valid signature'))
     } else {
-      console.log('Invalid signature')
+      console.log(chalk.red('...invalid signature'))
     }
-
+    console.log("created tx: " + signedTx.serialize().toString('hex'))
     return signedTx;
   }
 
@@ -138,7 +169,8 @@ export default class IbisWorker extends EventEmitter{
       console.log(chalk.gray(`...sending ttx with hash `), txHash);
 
       if(eth instanceof devp2p.ETH) {
-        (eth as devp2p.ETH).sendMessage(devp2p.ETH.MESSAGE_CODES.TX, ttx.serialize());
+        (eth as devp2p.ETH).sendMessage(devp2p.ETH.MESSAGE_CODES.TX, [ttx.serialize()]);
+
           console.log(chalk.green(`sent ttx <3`));
       } else {
         console.log(chalk.gray(`...peer using LES protocol, ttx not sent`))
@@ -150,14 +182,17 @@ export default class IbisWorker extends EventEmitter{
         console.log(e);
       }
 
+      this._sent_tx += 1;
   }
 
   verifyTTx(tx: TypedTransaction) {
-    console.log(chalk.magenta(`(ibis)`) + chalk.green(` received tx, checking if ttx... )`));
+    console.log(chalk.magenta(`(ibis)`) + chalk.green(` verifying TTx...`));
     console.log(chalk.gray(`...currently ${this._ttx_hashes.size} TTx's in circulation`))
 
-    if(tx.hash().toString('hex') in this._ttx_hashes) {
-      console.log(chalk.green(`...parsed message is a ttx`));
+    let txHash = tx.hash().toString('hex')
+
+    if(this._ttx_hashes.has(txHash)) {
+      console.log(chalk.green(`...parsed message is a TTx!`));
       return true;
     } else {
       console.log(chalk.red(`...parsed message is not a ttx`));

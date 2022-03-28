@@ -1,4 +1,4 @@
-FROM ethereum/client-go:alltools-v1.10.1
+FROM ethereum/client-go:stable
 
 # install required packages
 RUN apk add --update git bash nodejs npm perl &&\
@@ -14,7 +14,6 @@ RUN cd /root &&\
 
 RUN apk add --update util-linux &&\
     whereis pm2
-
 
 # add config files
 COPY start.sh /root/start.sh

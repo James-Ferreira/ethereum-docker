@@ -55,32 +55,14 @@ services:
       --http.api "admin,debug,web3,eth,txpool,personal,ethash,miner,net"
       --http.corsdomain="*"
       --netrestrict="172.16.254.62/26"
-      --verbosity 2
       --allow-insecure-unlock
+      --mine
+      --miner.threads=1
+      --miner.gasprice=0
       '
     networks:
       priv-eth-net:
 
-  geth_mainnet:
-    image: ethereum/client-go:stable
-    command: '
-      --datadir=~/.ethereum/devchain
-      --http
-      --http.api "admin,debug,web3,eth,txpool,personal,ethash,miner,net"
-      --http.corsdomain="*"
-      --verbosity 4
-      '
-    volumes:
-      - ./config/password:/root/files/password:ro
-      - ./config/keystore:/root/.ethereum/devchain/keystore:rw
-      - /etc/localtime:/etc/localtime:ro
-    ports:
-      - "30303:30303"
-      - "30303:30303/udp"
-      - "8545:8545"
-    networks:
-      pub-eth-net:
-  
   ethereumjs:
     container_name: cont_ethereumjs
     build: ethereumjs
@@ -90,12 +72,15 @@ services:
     #   - "DEBUG=devp2p:*"
     command: '
       npm run --prefix /usr/ibis/ethereumjs-monorepo/packages/client client:start --
-      --gethGenesis=/root/genesis.json
+      --customChain=/root/genesis.json
+      --customGenesisState=/root/state.json
       --bootnodes=enode://288b97262895b1c7ec61cf314c2e2004407d0a5dc77566877aad1f2a36659c8b698f4b56fd06c4a0c0bf007b4cfb3e7122d907da3b005fa90e724441902eb19e@172.16.254.62:30303
       --rpc
+      --loglevel=info
       --discV4=true'
     volumes:
-    - ./config/genesis.json:/root/genesis.json:ro
+    - ./ethereumjs/ethereumjs-scripts/js-genesis.json:/root/genesis.json:ro
+    - ./ethereumjs/ethereumjs-scripts/js-state.json:/root/state.json:ro
     - ./ethereumjs/ethereumjs-scripts:/usr/ibis/ethereumjs-monorepo/packages/devp2p/examples
     - ./ethereumjs/src/ibis_dpt.ts:/usr/ibis/ethereumjs-monorepo/packages/devp2p/src/dpt/dpt.ts
     - ./ethereumjs/src/ibis_server.ts:/usr/ibis/ethereumjs-monorepo/packages/devp2p/src/dpt/server.ts
@@ -104,21 +89,6 @@ services:
       - "30303:30303/udp"
     networks:
       priv-eth-net:
-
-  cyto:
-    container_name: cyto
-    build: cytoscape
-    working_dir: /app
-    volumes:
-    - type: bind
-      source: ./cytoscape/app
-      target: /app
-    environment:
-      PORT: 8888
-      CHOKIDAR_USEPOLLING: "true"
-    ports:
-      - 8888:8888
-    restart: always
 
   netstats:
     build: eth-netstats
@@ -133,6 +103,43 @@ services:
     networks:
       priv-eth-net:
       pub-eth-net:
+
+
+  # geth_mainnet:
+  #   image: ethereum/client-go:latest
+  #   command: '
+  #     --datadir=~/.ethereum/devchain
+  #     --http
+  #     --http.api "admin,debug,web3,eth,txpool,personal,ethash,miner,net"
+  #     --http.corsdomain="*"
+  #     --verbosity 4
+  #     '
+  #   volumes:
+  #     - ./config/password:/root/files/password:ro
+  #     - ./config/keystore:/root/.ethereum/devchain/keystore:rw
+  #     - /etc/localtime:/etc/localtime:ro
+  #   ports:
+  #     - "30303:30303"
+  #     - "30303:30303/udp"
+  #     - "8545:8545"
+  #   networks:
+  #     pub-eth-net:
+  
+  # cyto:
+  #   container_name: cyto
+  #   build: cytoscape
+  #   working_dir: /app
+  #   volumes:
+  #   - type: bind
+  #     source: ./cytoscape/app
+  #     target: /app
+  #   environment:
+  #     PORT: 8888
+  #     CHOKIDAR_USEPOLLING: "true"
+  #   ports:
+  #     - 8888:8888
+  #   restart: always
+
 
 networks:
   priv-eth-net:
