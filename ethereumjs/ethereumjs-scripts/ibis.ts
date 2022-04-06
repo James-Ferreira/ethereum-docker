@@ -17,10 +17,17 @@ import { rlp } from 'ethereumjs-util'
 import Common, { Chain, Hardfork } from '@ethereumjs/common'
 import myCustomChain from './js-genesis.json'
 
+/* MongoDb */
+import DatabaseAdapter from "./db/dbAdapter"
+import { TTxModel, TTxRecord } from "./db/taggedtransaction";
+
+
 type NodeType = { id: string, lastSeen: string}
 type Record = {id: string, lastSeen: string}
 const CHAIN_ID =  0x189f624f;
 const Web3 = require('web3')
+
+
 
 export default class IbisWorker extends EventEmitter{
     _private_key: Buffer
@@ -34,7 +41,8 @@ export default class IbisWorker extends EventEmitter{
     _map: Map<string, string>
     _rl: readline.Interface
     _active: boolean
-    _sent_tx: number
+    tx_nonce: number
+    _db: DatabaseAdapter
 
     constructor(private_key: Buffer, dpt: devp2p.DPT, rlpx: devp2p.RLPx) {
       super()
@@ -51,19 +59,24 @@ export default class IbisWorker extends EventEmitter{
         output: process.stdout
       });
       this._active = false;
-      this._sent_tx = 0;
-
+      this.tx_nonce = 0;
+      this._db = new DatabaseAdapter();
     }
 
 
 
   /* TAGGED TRANSACTION FUNCTIONS */
 
+  /**
+   * Facilitates the CLI to manually control the IBIS Tagged Transaction functionality
+   * @returns Promise when TTx logic has returned
+   */
   async ttx_menu() {
     console.log(chalk.red("\n TTx targets"))
     let count = 0;
     let peers = this._rlpx.getPeers() as Array<devp2p.Peer>;
 
+    // print peers
     for(let peer of peers){
       let addr = peer._socket.remoteAddress;
       let id = peer.getId();
@@ -95,64 +108,29 @@ export default class IbisWorker extends EventEmitter{
    createTTx() {
      const common = new Common({ chain: myCustomChain, hardfork: Hardfork.London})
 
-     //eip-1558
+     //create eip-1558 transaction
      const txData = {
       data: randomBytes(3),
       gasLimit: "0x124F80",
       maxPriorityFeePerGas: "0x01",
       maxFeePerGas: "0xff",
-      nonce: this._sent_tx,
+      nonce: this.tx_nonce,
       to: "0xcccccccccccccccccccccccccccccccccccccccc",
       value: "0x0186a0",
       chainId: "0x189f624f",
       accessList: [],
       type: "0x02"
     }
-
-    //eip-2930
-    // const txData = {
-    //   "data": "0x1a8451e600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-    //   "gasLimit": "0x02625a00",
-    //   "gasPrice": "0x01",
-    //   "nonce": "0x00",
-    //   "to": "0xcccccccccccccccccccccccccccccccccccccccc",
-    //   "value": "0x0186a0",
-    //   "v": "0x01",
-    //   "r": "0xafb6e247b1c490e284053c87ab5f6b59e219d51f743f7a4d83e400782bc7e4b9",
-    //   "s": "0x479a268e0e0acd4de3f1e28e4fac2a6b32a4195e8dfa9d19147abe8807aa6f64",
-    //   "chainId": CHAIN_ID,
-    //   "accessList": [
-    //     {
-    //       "address": "0x0000000000000000000000000000000000000101",
-    //       "storageKeys": [
-    //         "0x0000000000000000000000000000000000000000000000000000000000000000",
-    //         "0x00000000000000000000000000000000000000000000000000000000000060a7"
-    //       ]
-    //     }
-    //   ],
-    //   "type": "0x01"
-    // }
-
-
-    //legacy (not supported)
-    // const txData = {
-    //   nonce: '0x00',
-    //   gasPrice: '0x09184e72a000',
-    //   gasLimit: '0x2710',
-    //   to: '0x0000000000000000000000000000000000000000',
-    //   value: '0x00',
-    //   data: '0x7f7465737432000000000000000000000000000000000000000000000000000000600057',
-    // }
     const tx = TransactionFactory.fromTxData(txData, { common })
 
+    //sign and validate
     const signedTx = tx.sign(this._private_key)
-
     if (signedTx.validate() && signedTx.getSenderAddress().equals(this._address)) {
       console.log(chalk.green('...valid signature'))
     } else {
       console.log(chalk.red('...invalid signature'))
     }
-    console.log("created tx: " + signedTx.serialize().toString('hex'))
+
     return signedTx;
   }
 
@@ -162,43 +140,58 @@ export default class IbisWorker extends EventEmitter{
     // create the tagged transaction
     const ttx = this.createTTx()
     const txHash = ttx.hash().toString('hex')
+    console.log(chalk.magenta(`(ibis)`) + chalk.green(" created tx: ") + txHash);
 
     // get peer information
     const eth = target.getProtocols()[0]
     try {
-      console.log(chalk.gray(`...sending ttx with hash `), txHash);
 
       if(eth instanceof devp2p.ETH) {
         (eth as devp2p.ETH).sendMessage(devp2p.ETH.MESSAGE_CODES.TX, [ttx.serialize()]);
-
-          console.log(chalk.green(`sent ttx <3`));
+        console.log(chalk.magenta(`(ibis)`) + chalk.green(" sent tx: ") + txHash);
       } else {
         console.log(chalk.gray(`...peer using LES protocol, ttx not sent`))
       }
       this._ttx_hashes.add(txHash)
       console.log(chalk.green(`...now tracking ${this._ttx_hashes.size} TTx's...`));
 
-      } catch(e){
-        console.log(e);
-      }
-
-      this._sent_tx += 1;
+    } catch(e){
+      console.log(e);
+    }
+    console.log(chalk.magenta(`(ibis)`) + "tracking " + chalk.cyan(` ${this._ttx_hashes.size}`) + " TTx's...");
+    
+    //used to increment transaction nonce
+    this.tx_nonce += 1; 
   }
 
-  verifyTTx(tx: TypedTransaction) {
-    console.log(chalk.magenta(`(ibis)`) + chalk.green(` verifying TTx...`));
-    console.log(chalk.gray(`...currently ${this._ttx_hashes.size} TTx's in circulation`))
-
+  verifyTTx(tx: TypedTransaction, peerAddr: string) {
+    console.log(chalk.magenta(`(ibis)`) + chalk.green(` verifying TTx from `) + peerAddr );
+    console.log(chalk.gray(`...there are ${this._ttx_hashes.size} TTx's in circulation`))
     let txHash = tx.hash().toString('hex')
 
     if(this._ttx_hashes.has(txHash)) {
-      console.log(chalk.green(`...parsed message is a TTx!`));
+      console.log(chalk.green(`... parsed message is a TTx!`));
+      
+      let record: TTxRecord = {
+        name: peerAddr,
+        ttxhash: txHash,
+        time: Date.now().toString(),
+      }
+
+      this._db.addRecord(record);
+      console.log("\n\n db contents")
+      this._db.findRecord();
+
       return true;
     } else {
-      console.log(chalk.red(`...parsed message is not a ttx`));
+      console.log(chalk.red(`... parsed message is not a ttx`));
       return false;
     }
   }
+
+  
+
+
 
   /* Delving Functions */
 

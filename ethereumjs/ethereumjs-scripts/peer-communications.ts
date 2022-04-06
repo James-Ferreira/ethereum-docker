@@ -17,6 +17,9 @@ import { PeerInfo, xor, ETH, Peer } from '@ethereumjs/devp2p'
 import { buffer2int } from '@ethereumjs/devp2p'
 import { Address } from 'ethereumjs-util'
 
+
+
+/* Setup the chain */
 const PRIVATE_KEY = Buffer.from("133965f412d1362645cbd963619023585abc8765c7372ed238374acb884b2b3a", 'hex')
 var GENESIS_DIFFICULTY = 0x77777; 
 var GENESIS_HASH = "98a440ae7d107996b4a68e08e54b36acaefb63e66dcbabfe115618116713f4cb";
@@ -26,9 +29,6 @@ const bootnode = {
   udpPort: 30303,
   tcpPort: 30303,
 }
-
-/* SETUP */
-const getPeerAddr = (peer: Peer) => `${peer._socket.remoteAddress}:${peer._socket.remotePort}`
 const common = new Common({ chain: myCustomChain, hardfork: Hardfork.London})
 const REMOTE_CLIENTID_FILTER = [
   'go1.5',
@@ -62,6 +62,11 @@ const IBIS = new IbisWorker(PRIVATE_KEY, dpt, rlpx)
 /* accept incoming connections */
 dpt.bind(30303, '0.0.0.0')
 rlpx.listen(30303, '0.0.0.0')
+
+/* SETUP */
+const getPeerAddr = (peer: Peer) => `${peer._socket.remoteAddress}:${peer._socket.remotePort}`
+
+
 
 dpt.addPeer(bootnode).catch((err) => {
   console.error(chalk.bold.red(`DPT bootstrap error: ${err.stack || err}`))
@@ -140,21 +145,18 @@ rlpx.on('peer:added', (peer) => {
 
       case devp2p.ETH.MESSAGE_CODES.TX:
         if (!forkVerified) break
-
+        console.log("transaction received from: " + addr)
         try {
           const tx = TransactionFactory.fromSerializedData(payload);
           console.log(chalk.gray("...transaction received with hash: ") + tx.hash().toString('hex'))
-          // console.log(chalk.gray("...transaction received with contents: ") + JSON.stringify(tx.toJSON()))
-          IBIS.verifyTTx(tx);
+          IBIS.verifyTTx(tx, addr);
         }
         catch(e) {
           console.log(chalk.gray("...attemping to parse tx from block body"));
           for (const item of payload) {
             const tx = TransactionFactory.fromBlockBodyData(item)
             console.log(chalk.gray("...transaction received with hash: ") + tx.hash().toString('hex'))
-            // console.log(chalk.gray("...transaction received with contents: ") + JSON.stringify(tx.toJSON()))
-
-            IBIS.verifyTTx(tx);
+            IBIS.verifyTTx(tx, addr);
           }
         }
         finally {

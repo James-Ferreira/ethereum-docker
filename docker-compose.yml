@@ -1,6 +1,81 @@
 version: '3'
 
+networks:
+  priv-eth-net:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+      - subnet: 172.16.254.62/26
+  pub-eth-net:
+    driver: bridge
+
+volumes:
+  mongodb:
+
 services:
+
+  mongodb:
+    container_name: cont_mongodb
+    image: mongo
+    environment:
+    -  MONGO_INITDB_DATABASE=test
+    -  MONGO_INITDB_ROOT_USERNAME=admin
+    -  MONGO_INITDB_ROOT_PASSWORD=admin
+    ports:
+      - 27017:27017
+    volumes:
+      - mongodb:/data/db
+    networks:
+      priv-eth-net:
+
+  visualiser:
+    container_name: cont_visualiser
+    build: visualiser
+    volumes:
+      - ./visualiser/src:/app/src
+    ports:
+      - 8888:8888
+    networks:
+      priv-eth-net:
+      pub-eth-net:
+
+  visualiser-backend:
+    build: visualiser-backend
+    ports:
+      - 8080:8080
+    networks:
+      priv-eth-net:
+      pub-eth-net:
+
+  # /* ETHEREUM */
+      
+  ethereumjs:
+    container_name: cont_ethereumjs
+    build: ethereumjs
+    # links:
+    #   - bootstrap
+    # environment:
+    #   - "DEBUG=devp2p:*"
+    # command: '
+    #   npm run --prefix /usr/ibis/ethereumjs-monorepo/packages/client client:start --
+    #   --customChain=/root/genesis.json
+    #   --customGenesisState=/root/state.json
+    #   --bootnodes=enode://288b97262895b1c7ec61cf314c2e2004407d0a5dc77566877aad1f2a36659c8b698f4b56fd06c4a0c0bf007b4cfb3e7122d907da3b005fa90e724441902eb19e@172.16.254.62:30303
+    #   --rpc
+    #   --loglevel=info
+    #   --discV4=true'
+    volumes:
+    - ./ethereumjs/ethereumjs-scripts/js-genesis.json:/root/genesis.json:ro
+    - ./ethereumjs/ethereumjs-scripts/js-state.json:/root/state.json:ro
+    - ./ethereumjs/ethereumjs-scripts:/usr/ibis/ethereumjs-monorepo/packages/devp2p/examples
+    - ./ethereumjs/src/ibis_dpt.ts:/usr/ibis/ethereumjs-monorepo/packages/devp2p/src/dpt/dpt.ts
+    - ./ethereumjs/src/ibis_server.ts:/usr/ibis/ethereumjs-monorepo/packages/devp2p/src/dpt/server.ts
+    ports:
+      - "30303:30303"
+      - "30303:30303/udp"
+    networks:
+      priv-eth-net:
 
   bootstrap:
     container_name: bootstrap
@@ -63,32 +138,6 @@ services:
     networks:
       priv-eth-net:
 
-  ethereumjs:
-    container_name: cont_ethereumjs
-    build: ethereumjs
-    links:
-      - bootstrap
-    # environment:
-    #   - "DEBUG=devp2p:*"
-    command: '
-      npm run --prefix /usr/ibis/ethereumjs-monorepo/packages/client client:start --
-      --customChain=/root/genesis.json
-      --customGenesisState=/root/state.json
-      --bootnodes=enode://288b97262895b1c7ec61cf314c2e2004407d0a5dc77566877aad1f2a36659c8b698f4b56fd06c4a0c0bf007b4cfb3e7122d907da3b005fa90e724441902eb19e@172.16.254.62:30303
-      --rpc
-      --loglevel=info
-      --discV4=true'
-    volumes:
-    - ./ethereumjs/ethereumjs-scripts/js-genesis.json:/root/genesis.json:ro
-    - ./ethereumjs/ethereumjs-scripts/js-state.json:/root/state.json:ro
-    - ./ethereumjs/ethereumjs-scripts:/usr/ibis/ethereumjs-monorepo/packages/devp2p/examples
-    - ./ethereumjs/src/ibis_dpt.ts:/usr/ibis/ethereumjs-monorepo/packages/devp2p/src/dpt/dpt.ts
-    - ./ethereumjs/src/ibis_server.ts:/usr/ibis/ethereumjs-monorepo/packages/devp2p/src/dpt/server.ts
-    ports:
-      - "30303:30303"
-      - "30303:30303/udp"
-    networks:
-      priv-eth-net:
 
   netstats:
     build: eth-netstats
@@ -125,28 +174,5 @@ services:
   #   networks:
   #     pub-eth-net:
   
-  # cyto:
-  #   container_name: cyto
-  #   build: cytoscape
-  #   working_dir: /app
-  #   volumes:
-  #   - type: bind
-  #     source: ./cytoscape/app
-  #     target: /app
-  #   environment:
-  #     PORT: 8888
-  #     CHOKIDAR_USEPOLLING: "true"
-  #   ports:
-  #     - 8888:8888
-  #   restart: always
 
 
-networks:
-  priv-eth-net:
-    driver: bridge
-    internal: true
-    ipam:
-      config:
-      - subnet: 172.16.254.62/26
-  pub-eth-net:
-    driver: bridge

@@ -19,11 +19,9 @@ COPY /src/ibis_server.ts /usr/ibis/ethereumjs-monorepo/packages/devp2p/src/dpt/s
 
 # install npm
 RUN cd ethereumjs-monorepo \
-    && npm i
-    # && npm run build --workspaces
-    # && npm run build --workspace=@ethereumjs/devp2p
-
-RUN npm install crypto-js web3
+    && npm i \
+    && npm install crypto-js web3 mongoose node-fetch \
+    && npm i @types/node-fetch --save-dev
 
 RUN echo 'alias debug="cd /usr/ibis/ethereumjs-monorepo/packages/devp2p;DEBUG=devp2p:* node -r ts-node/register ./examples/peer-communications.ts"' >> ~/.bashrc
 RUN echo 'alias ibis="cd /usr/ibis/ethereumjs-monorepo/packages/devp2p; node -r ts-node/register ./examples/peer-communications.ts"' >> ~/.bashrc
