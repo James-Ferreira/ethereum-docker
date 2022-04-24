@@ -24,13 +24,15 @@ function App() {
   }
 
   function addNewRecord() {
-    const text = "fake ttx"
+    const name = "fake ttx"
+    const hash = "fake hash"
+    const time = Date.now().toString()
     fetch(`${apiUrl}/records`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ name, hash, time }),
     }).then(async (response) => {
       const data = await response.json();
 
@@ -48,7 +50,17 @@ function App() {
       {/* <CytoContainer /> */}
       <button onClick={onSubmit}> Submit Fake TTX </button>
       <button onClick={fetchRecords}> Fetch </button>
-        <Records records={records} />
+
+      <h1> TxRecords </h1>
+      <ul>
+        {records.map((record) => (
+          <li style={{ color: "red", fontSize: "18px" }}>{record.name} received {record.hash} at {record.time}</li>
+        ))}
+      </ul>
+
+      <h1> Tagged Transactions </h1>
+
+      
     </div>
   );
 }

@@ -1,0 +1,90 @@
+{
+    "name": "ibis test bed",
+    "chainId": 413098575,
+    "networkId": 413098575,
+    "consensus": {
+      "type": "pow",
+      "algorithm": "ethash",
+      "ethash": {}
+    },
+    "comment": "The IBIS Docker Testbed",
+  
+    "genesis": {
+      "hash": "0x98a440ae7d107996b4a68e08e54b36acaefb63e66dcbabfe115618116713f4cb",
+      "timestamp": 0,
+      "gasLimit": 12000000,
+      "difficulty": "0x77777",
+      "nonce": "0x0000000000000000",
+      "extraData": "0x",
+      "stateRoot": "0x2c689e92624a5a8f6d043be49739e02e1a49422af9b0b3e27427f1a85724285f"
+    },
+  
+    "bootstrapNodes": [
+      {
+        "ip": "172.16.254.62",
+        "port": 30303,
+        "id": "94b82260db33e63d1b7425f11152a50b91887591a2447b233105f392dbae72ce",
+        "location": "ap-southeast-1-001",
+        "comment": "bootnode node ip"
+      }],
+  
+  
+      "hardforks": [
+          {
+            "name": "chainstart",
+            "block": 0,
+            "forkHash": "0xfc64ec04"
+          },
+          {
+            "name": "homestead",
+            "block": 0,
+            "forkHash": "0x97c2c34c"
+          },
+          {
+            "name": "dao",
+            "block": 0,
+            "forkHash": "0x91d1f948"
+          },
+          {
+            "name": "tangerineWhistle",
+            "block": 0,
+            "forkHash": "0x7a64da13"
+          },
+          {
+            "name": "spuriousDragon",
+            "block": 0,
+            "forkHash": "0x3edd5b10"
+          },
+          {
+            "name": "byzantium",
+            "block": 0,
+            "forkHash": "0xa00bc324"
+          },
+          {
+            "name": "constantinople",
+            "block": 0,
+            "forkHash": "0x668db0af"
+          },
+          {
+            "name": "petersburg",
+            "block": 0,
+            "forkHash": "0x668db0af"
+          },
+          {
+            "name": "istanbul",
+            "block": 0,
+            "forkHash": null
+          },
+          {
+            "name": "berlin",
+            "block": 0,
+            "forkHash": null
+          },
+          {
+            "name": "london",
+            "block": 0,
+            "forkHash": null
+          }
+      ]
+  }
+  
