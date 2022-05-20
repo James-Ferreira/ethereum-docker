@@ -17,7 +17,8 @@ export default function ChordContainer(matrix, nodeMap) {
       height: "600px",
       width: "800px",
       justifyContent: "center",
-      alignContent: "center"
+      alignContent: "center",
+      padding: "2em"
       }}>
       <ChordDiagram
         matrix={matrix}
@@ -27,8 +28,8 @@ export default function ChordContainer(matrix, nodeMap) {
         groupColors={gradientArray}
         groupOnClick={(idx) => alert('Clicked group: ' + idx)}
         ribbonOnClick={(idx) => alert('Clicked ribbon: ' + idx)}
-        height={500}
-        width={650}
+        height={600}
+        width={800}
       />
     </div>
   )

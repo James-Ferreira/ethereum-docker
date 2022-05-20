@@ -66,7 +66,7 @@ app.post("/records", async (req, res) => {
 });
 
 mongoose.connect(
-  "mongodb://cont_mongodb:27017/ttx-records",
+  "mongodb://mongodb:27017/ibis_db",
   {
     auth: {
       username: "admin",

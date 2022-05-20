@@ -5,7 +5,7 @@ import { DelveEntry, DelveIds, DelveResults, DelveIdsSchema, DelveResultsSchema,
 
 export default class DatabaseAdapter {
     _client: any;
-    DB_CONN_STRING = 'mongodb://cont_mongodb:27017/ibis_db'
+    DB_CONN_STRING = 'mongodb://mongodb:27017/ibis_db'
     CONN_OPTS = {
         auth: {
           username: "admin",
@@ -44,15 +44,18 @@ export default class DatabaseAdapter {
      * @param hash 
      * @param receipt 
      */
-    async addTTxReceipt(tx_hash: string, receipt: TTxReceipt) {
+    async addTTxReceipt(ttx_hash: string, receipt: TTxReceipt) {
         //retrieve the ttx record
-        //let record = await this.findTxRecord(tx_hash);
+        //let record: TTxRecordInterface = await TTxRecordModel.find({ttx_hash: tx_hash})
         //push the new TTxReceipt into the ttx record
-        //record.receipts.push(receipt);
-        TTxRecordModel.update(
-            {ttx_hash: tx_hash},
+        //record.save()
+        console.log(`adding a TTx receipt to  ${TTxRecordModel.find({ttx_hash: ttx_hash})}`)
+        let doc = await TTxRecordModel.findOneAndUpdate(
+            {ttx_hash: ttx_hash},
             {$addToSet: {receipts: receipt}}
         )
+        if(doc) console.log(`updated receipts  ${doc.receipts}`)
+
     }
 
     /**
@@ -91,6 +94,20 @@ export default class DatabaseAdapter {
     // }
 
 
-
+    // addNewTTxRecord(record: TTxRecord) {
+    //     const apiUrl = "http://localhost:8080";
+    //     fetch(`${apiUrl}/records`, {
+    //         method: "POST",
+    //         headers: {
+    //           "Content-Type": "application/json",
+    //         },
+      
+    //         body: JSON.stringify({record}),
+      
+    //       }).then(async (response) => {
+    //         const data = await response.json();
+    //         return data.record
+    //       });
+    // }
   }
   

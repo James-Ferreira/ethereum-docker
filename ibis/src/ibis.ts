@@ -144,17 +144,18 @@ export default class IbisWorker extends EventEmitter{
 
     //if(this._ttx_hashes.has(txHash)) {
     try {
-      this._db.findTxRecord(txHash)
 
-        console.log(chalk.green(`... parsed message is a TTx!`));
-  
-        this._db.addTTxReceipt(txHash, {
-          returner_addr: peerAddr,
-          ibis_receiver_addr: this._address.toString(),
-          time_returned:  Date.now().toString(),
-        });
-  
-        return true;
+      let receipt = {
+        returner_addr: peerAddr,
+        ibis_receiver_addr: this._address.toString(),
+        time_returned:  Date.now().toString(),
+      }
+      
+      console.log(chalk.green(`... parsed message is a TTx!!!`));
+
+      this._db.addTTxReceipt(txHash, receipt);
+
+      return true;
     } catch (error) {
       console.log(chalk.red(`... parsed message is not a ttx`));
       return false;
