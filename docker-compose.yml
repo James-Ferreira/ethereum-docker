@@ -40,16 +40,15 @@ services:
       priv-eth-net:
       pub-eth-net:
 
-  db-backend:
-    build: db-backend
+  express:
+    build: express
     ports:
       - 8080:8080
     networks:
       priv-eth-net:
       pub-eth-net:
 
-  # /* ETHEREUM */
-      
+  # /* IBIS */
   ibis:
     container_name: ibis
     build: ibis
@@ -75,6 +74,7 @@ services:
     networks:
       priv-eth-net:
 
+  # /* GoEthereum */
   bootstrap:
     container_name: bootstrap
     hostname: bootstrap

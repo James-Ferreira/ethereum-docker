@@ -1,6 +1,6 @@
 FROM node:16
 WORKDIR /app
-# ENV PATH /app/node_modules/.bin:$PATH
+ENV PATH /app/node_modules/.bin:$PATH
 ENV PORT=8888
 
 WORKDIR /app

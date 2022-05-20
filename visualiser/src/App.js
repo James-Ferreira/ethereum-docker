@@ -1,6 +1,5 @@
 import { useRef, useState, useEffect } from "react";
-import Records from "./components/Records";
-import CytoContainer from './containers/CytoContainer';
+import ChordContainer from "./containers/ChordContainer";
 
 function App() {
   const inputText = useRef("");
@@ -42,6 +41,26 @@ function App() {
     });
   }
 
+
+  /*
+    Computes the chord layout for the specified square matrix of size n×n, 
+    where the matrix represents the directed flow amongst a network (a complete digraph)
+    of n nodes.
+    
+    The given matrix must be an array of length n, where each element matrix[i] is an
+    array of n numbers, where each matrix[i][j] represents the flow from the ith node
+    in the network to the jth node. 
+    
+    Each number matrix[i][j] must be nonnegative, though it can be zero if there is no
+    flow from node i to node j. 
+  */
+  const matrix = [
+    [0, 0, 0, 1], //A black
+    [0, 1, 1, 1], //B yellow
+    [0, 1, 1, 1], //C brown
+    [0, 1, 1, 0], //D orange
+  ]; 
+
   return (
     <div style={{
       height: "100vh",
@@ -60,7 +79,8 @@ function App() {
 
       <h1> Tagged Transactions </h1>
 
-      
+      {ChordContainer(matrix)}
+
     </div>
   );
 }
