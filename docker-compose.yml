@@ -15,6 +15,8 @@ volumes:
 
 services:
 
+  #/* Web Application */
+
   mongodb:
     container_name: cont_mongodb
     image: mongo
@@ -29,17 +31,6 @@ services:
     networks:
       priv-eth-net:
 
-  visualiser:
-    container_name: cont_visualiser
-    build: visualiser
-    volumes:
-      - ./visualiser/src:/app/src
-    ports:
-      - 8888:8888
-    networks:
-      priv-eth-net:
-      pub-eth-net:
-
   express:
     build: express
     ports:
@@ -48,105 +39,119 @@ services:
       priv-eth-net:
       pub-eth-net:
 
+  visualiser:
+    container_name: cont_visualiser
+    build: visualiser
+    links:
+    - mongodb
+    - express
+    volumes:
+      - ./visualiser/src:/app/src
+    ports:
+      - 8888:8888
+    networks:
+      priv-eth-net:
+      pub-eth-net:    
+
   # /* IBIS */
-  ibis:
-    container_name: ibis
-    build: ibis
-    # links:
-    #   - bootstrap
-    # environment:
-    #   - "DEBUG=devp2p:*"
-    # command: '
-    #   npm run --prefix /usr/ibis/ethereumjs-monorepo/packages/client client:start --
-    #   --customChain=/root/genesis.json
-    #   --customGenesisState=/root/state.json
-    #   --bootnodes=enode://288b97262895b1c7ec61cf314c2e2004407d0a5dc77566877aad1f2a36659c8b698f4b56fd06c4a0c0bf007b4cfb3e7122d907da3b005fa90e724441902eb19e@172.16.254.62:30303
-    #   --rpc
-    #   --loglevel=info
-    #   --discV4=true'
-    volumes:
-    - ./ibis/src/config/js-genesis.json:/root/genesis.json:ro
-    - ./ibis/src/config/js-state.json:/root/state.json:ro
-    - ./ibis/src:/usr/ibis/ethereumjs-monorepo/packages/devp2p/ibis-client
-    ports:
-      - "30303:30303"
-      - "30303:30303/udp"
-    networks:
-      priv-eth-net:
+  # ibis:
+  #   container_name: ibis
+  #   build: ibis
+  #   # links:
+  #   #   - bootstrap
+  #   # environment:
+  #   #   - "DEBUG=devp2p:*"
+  #   # command: '
+  #   #   npm run --prefix /usr/ibis/ethereumjs-monorepo/packages/client client:start --
+  #   #   --customChain=/root/genesis.json
+  #   #   --customGenesisState=/root/state.json
+  #   #   --bootnodes=enode://288b97262895b1c7ec61cf314c2e2004407d0a5dc77566877aad1f2a36659c8b698f4b56fd06c4a0c0bf007b4cfb3e7122d907da3b005fa90e724441902eb19e@172.16.254.62:30303
+  #   #   --rpc
+  #   #   --loglevel=info
+  #   #   --discV4=true'
+  #   volumes:
+  #   - ./ibis/src/config/js-genesis.json:/root/genesis.json:ro
+  #   - ./ibis/src/config/js-state.json:/root/state.json:ro
+  #   - ./ibis/src:/usr/ibis/ethereumjs-monorepo/packages/devp2p/ibis-client
+  #   ports:
+  #     - "30303:30303"
+  #     - "30303:30303/udp"
+  #   networks:
+  #     priv-eth-net:
 
-  # /* GoEthereum */
-  bootstrap:
-    container_name: bootstrap
-    hostname: bootstrap
-    restart: on-failure
-    build: monitored-geth-client
-    env_file:
-      - .env
-    volumes:
-      - ./config/password:/root/files/password:ro
-      - ./config/genesis.json:/root/files/genesis.json:ro
-      - ./config/keystore:/root/.ethereum/devchain/keystore:rw
-      - /etc/localtime:/etc/localtime:ro
-    ports:
-      - "8545:8545"
-    entrypoint: /root/start.sh
-    command: '
-      --datadir=~/.ethereum/devchain 
-      --nodekeyhex=091bd6067cb4612df85d9c1ff85cc47f259ced4d4cd99816b14f35650f59c322
-      --networkid=413098575
-      --http
-      --http.addr="172.16.254.62"
-      --http.api "admin,debug,web3,eth,txpool,personal,ethash,miner,net"
-      --http.corsdomain="*"
-      --netrestrict="172.16.254.62/26"
-      --nat extip:172.16.254.62
-      --verbosity 3
-      '
-    links:
-      - netstats
-    networks:
-      priv-eth-net:
-        ipv4_address: 172.16.254.62
+  # # /* GoEthereum */
+  # bootstrap:
+  #   container_name: bootstrap
+  #   hostname: bootstrap
+  #   restart: on-failure
+  #   build: monitored-geth-client
+  #   env_file:
+  #     - .env
+  #   volumes:
+  #     - ./config/password:/root/files/password:ro
+  #     - ./config/genesis.json:/root/files/genesis.json:ro
+  #     - ./config/keystore:/root/.ethereum/devchain/keystore:rw
+  #     - /etc/localtime:/etc/localtime:ro
+  #   ports:
+  #     - "8545:8545"
+  #   entrypoint: /root/start.sh
+  #   command: '
+  #     --datadir=~/.ethereum/devchain 
+  #     --nodekeyhex=091bd6067cb4612df85d9c1ff85cc47f259ced4d4cd99816b14f35650f59c322
+  #     --networkid=413098575
+  #     --http
+  #     --http.addr="172.16.254.62"
+  #     --http.api "admin,debug,web3,eth,txpool,personal,ethash,miner,net"
+  #     --http.corsdomain="*"
+  #     --netrestrict="172.16.254.62/26"
+  #     --nat extip:172.16.254.62
+  #     --verbosity 3
+  #     '
+  #   links:
+  #     - netstats
+  #   networks:
+  #     priv-eth-net:
+  #       ipv4_address: 172.16.254.62
 
-  eth:
-    build: monitored-geth-client
-    restart: on-failure
-    links:
-      - bootstrap
-      - netstats
-    entrypoint: /root/start.sh
-    volumes:
-      - ./config/password:/root/files/password:ro
-      - ./config/genesis.json:/root/files/genesis.json:ro
-      - ./config/keystore:/root/.ethereum/devchain/keystore:rw
-      - /etc/localtime:/etc/localtime:ro
-    command: '
-      --datadir=~/.ethereum/devchain
-      --bootnodes="enode://288b97262895b1c7ec61cf314c2e2004407d0a5dc77566877aad1f2a36659c8b698f4b56fd06c4a0c0bf007b4cfb3e7122d907da3b005fa90e724441902eb19e@172.16.254.62:30303"
-      --networkid=413098575
-      --http
-      --http.api "admin,debug,web3,eth,txpool,personal,ethash,miner,net"
-      --http.corsdomain="*"
-      --netrestrict="172.16.254.62/26"
-      --allow-insecure-unlock
-      --mine
-      --miner.threads=1
-      --miner.gasprice=0
-      '
-    networks:
-      priv-eth-net:
+  # eth:
+  #   build: monitored-geth-client
+  #   restart: on-failure
+  #   links:
+  #     - bootstrap
+  #     - netstats
+  #   entrypoint: /root/start.sh
+  #   volumes:
+  #     - ./config/password:/root/files/password:ro
+  #     - ./config/genesis.json:/root/files/genesis.json:ro
+  #     - ./config/keystore:/root/.ethereum/devchain/keystore:rw
+  #     - /etc/localtime:/etc/localtime:ro
+  #   command: '
+  #     --datadir=~/.ethereum/devchain
+  #     --bootnodes="enode://288b97262895b1c7ec61cf314c2e2004407d0a5dc77566877aad1f2a36659c8b698f4b56fd06c4a0c0bf007b4cfb3e7122d907da3b005fa90e724441902eb19e@172.16.254.62:30303"
+  #     --networkid=413098575
+  #     --http
+  #     --http.api "admin,debug,web3,eth,txpool,personal,ethash,miner,net"
+  #     --http.corsdomain="*"
+  #     --netrestrict="172.16.254.62/26"
+  #     --allow-insecure-unlock
+  #     --mine
+  #     --miner.threads=1
+  #     --miner.gasprice=0
+  #     '
+  #   networks:
+  #     priv-eth-net:
 
 
-  netstats:
-    build: eth-netstats
-    restart: on-failure
-    container_name: netstats
-    environment:
-      - WS_SECRET=eth-net-stats-secret
-    volumes:
-      - /etc/localtime:/etc/localtime:ro
-    ports:
-      - "3000:3000"
-    networks:
-      priv-eth-net:
-      pub-eth-net:
+  # netstats:
+  #   build: eth-netstats
+  #   restart: on-failure
+  #   container_name: netstats
+  #   environment:
+  #     - WS_SECRET=eth-net-stats-secret
+  #   volumes:
+  #     - /etc/localtime:/etc/localtime:ro
+  #   ports:
+  #     - "3000:3000"
+  #   networks:
+  #     priv-eth-net:
+  #     pub-eth-net:

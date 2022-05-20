@@ -1,12 +1,10 @@
-const express = require("express");
-const mongoose = require("mongoose");
-const bodyParser = require("body-parser");
-var cors = require("cors");
-
+import {TTxRecordModel, TTxReceiptModel} from './models/txrecord.js'
+import express from "express"
+import mongoose from "mongoose"
+import bodyParser from 'body-parser';
+import cors from "cors"
 const PORT = 8080;
 const app = express();
-const TTxModel = require("./models/txrecord");
-
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 app.use(cors());
@@ -14,13 +12,14 @@ app.use(cors());
 app.get("/records", async (req, res) => {
   console.log('received get request')
   try {
-    const records = await TTxModel.find();
+    const records = await TTxRecordModel.find();
     res.status(200).json({
       records: records.map((record) => ({
-        id: record.id,
-        name: record.name,
-        ttxhash: record.ttxhash,
-        time: record.time,
+        ttx_hash: record.ttx_hash,
+        time_sent: record.time_sent,
+        target_addr: record.target_addr,
+        ibis_sender_addr: record.ibis_sender_addr,
+        receipts: record.receipts
       })),
     });
   } catch (err) {
@@ -30,23 +29,35 @@ app.get("/records", async (req, res) => {
 });
 
 app.post("/records", async (req, res) => {
-  console.log("received post")
-  const name = req.body.name;
-  const ttxhash = req.body.ttxhash;
-  const time = req.body.time;
-  console.log(req.body.text);
-  const record = new TTxModel({
+  console.log("received post: ", req.body)
+  const ttx_hash = req.body.ttx_hash
+  const time_sent = req.body.time_sent
+  const target_addr = req.body.target_addr
+  const ibis_sender_addr = req.body.ibis_sender_addr
+  const receipts = req.body.receipts
+
+  const record = new TTxRecordModel({
     _id: new mongoose.Types.ObjectId(),
-    name,
-    ttxhash,
-    time
+    ttx_hash,
+    time_sent,
+    target_addr,
+    ibis_sender_addr,
+    receipts
   });
 
   try {
     await record.save().catch((e) => console.log(e));
-    res.status(201).json({
+    console.log(res.status)
+    res.status(200).json({
       message: "Record has been added",
-      record: { _id: record._id, name: text, ttxhash: ttxhash, time: time },
+      record: {
+        _id: record._id,
+        ttx_hash: ttx_hash,
+        time_sent: time_sent,
+        target_addr: target_addr,
+        ibis_sender_addr: ibis_sender_addr,
+        receipts: receipts
+      }
     });
   } catch (err) {
     console.error(err.message);

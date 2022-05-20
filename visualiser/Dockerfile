@@ -9,6 +9,9 @@ COPY . .
 
 RUN npm install
 
+# the chord package is broken, I fix it
+COPY src/styles/chord.css node_modules/react-chord-diagram/es/main.css
+
 EXPOSE 8888
 
 ENV CHOKIDAR_USEPOLLING="true"

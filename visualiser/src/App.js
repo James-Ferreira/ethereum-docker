@@ -1,46 +1,33 @@
-import { useRef, useState, useEffect } from "react";
+import { useState } from "react";
 import ChordContainer from "./containers/ChordContainer";
+import { addNewRecord, fetchRecords, printBiMap, createNodeMap, createMatrix, processTTxMatrix } from "./util/helperFunctions";
+import Records from "./components/Records";
+import BiMap from 'bidirectional-map'
 
 function App() {
-  const inputText = useRef("");
-  const apiUrl = "http://localhost:8080";
   const [records, setRecords] = useState([]);
+  const [matrix, setMatrix] = useState([])
+  const [nodeMap, setNodeMap] = useState(new BiMap())
 
-  async function fetchRecords() {
-    const res = await fetch(`${apiUrl}/records`);
-    const data = await res.json();
-    console.log("fetched ", data)
-    setRecords(data.records);
+  async function onRefresh() {
+    let fetchedRecords = await fetchRecords();
+    setRecords(fetchedRecords);
+    console.log("refreshed " + fetchedRecords.length + " records...")
+    //nodeIndexMap = updateNodeMap(nodeIndexMap, fetchedRecords);
+    let bi_map = createNodeMap(records)
+
+    let node_matrix = createMatrix(bi_map.size);
+    node_matrix = processTTxMatrix(node_matrix, bi_map, records)
+    console.log(node_matrix)
+    setNodeMap(bi_map)
+    setMatrix(node_matrix)
   }
-
-  useEffect(() => {
-    fetchRecords();
-  }, []);
 
   function onSubmit(e) {
-    e.preventDefault();
-    addNewRecord();
+    console.log("submitting test TTx")
+    addNewRecord()
+    onRefresh()
   }
-
-  function addNewRecord() {
-    const name = "fake ttx"
-    const hash = "fake hash"
-    const time = Date.now().toString()
-    fetch(`${apiUrl}/records`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ name, hash, time }),
-    }).then(async (response) => {
-      const data = await response.json();
-
-      const newData = [...records, data.record];
-      setRecords(newData);
-      inputText.current.value = "";
-    });
-  }
-
 
   /*
     Computes the chord layout for the specified square matrix of size n×n, 
@@ -54,12 +41,14 @@ function App() {
     Each number matrix[i][j] must be nonnegative, though it can be zero if there is no
     flow from node i to node j. 
   */
-  const matrix = [
-    [0, 0, 0, 1], //A black
-    [0, 1, 1, 1], //B yellow
-    [0, 1, 1, 1], //C brown
-    [0, 1, 1, 0], //D orange
-  ]; 
+  // const matrix = [
+  //   [0, 1, 1, 0], //A black
+  //   [1, 0, 1, 1], //B yellow
+  //   [1, 1, 0, 0], //C brown
+  //   [1, 0, 0, 0], //D orange
+  // ]; 
+
+
 
   return (
     <div style={{
@@ -68,18 +57,13 @@ function App() {
     }}>
       {/* <CytoContainer /> */}
       <button onClick={onSubmit}> Submit Fake TTX </button>
-      <button onClick={fetchRecords}> Fetch </button>
+      <button onClick={onRefresh}> Fetch </button>
 
-      <h1> TxRecords </h1>
-      <ul>
-        {records.map((record) => (
-          <li style={{ color: "red", fontSize: "18px" }}>{record.name} received {record.hash} at {record.time}</li>
-        ))}
-      </ul>
+      <h1> TxRecords ({records.length})</h1>
+      {Records(records)}
 
       <h1> Tagged Transactions </h1>
-
-      {ChordContainer(matrix)}
+      {ChordContainer(matrix, nodeMap)}
 
     </div>
   );
