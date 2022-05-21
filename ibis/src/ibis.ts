@@ -121,8 +121,9 @@ export default class IbisWorker extends EventEmitter{
       let ttx_record: TTxRecord = {
         ttx_hash: txHash,
         time_sent: Date.now().toString(),
-        target_addr: `${target._socket.remoteAddress}:${target._socket.remotePort}`,
-        ibis_sender_addr: this._address.toString(),
+        // target_addr: `${target._socket.remoteAddress}:${target._socket.remotePort}`,
+        target_addr: `${target.getId().toString('hex').slice(0, 7)}`,
+        ibis_sender_addr: this._address.toString().slice(0, 7),
         receipts: [],
       }
 
