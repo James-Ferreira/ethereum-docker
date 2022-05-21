@@ -3,6 +3,9 @@ import ChordContainer from "./containers/ChordContainer";
 import { addNewRecord, fetchRecords, printBiMap, createNodeMap, createMatrix, processTTxMatrix } from "./util/helperFunctions";
 import Records from "./components/Records";
 import BiMap from 'bidirectional-map'
+// MUI
+import Button from '@mui/material/Button';
+import ibis from './assets/ibis-logo.png'
 
 function App() {
   const [records, setRecords] = useState([]);
@@ -52,19 +55,55 @@ function App() {
 
   return (
     <div style={{
-      height: "100vh",
-      width: "100vw"
+      display: "flex",
+      alignItems: "center"
     }}>
-      {/* <CytoContainer /> */}
-      <button onClick={onSubmit}> Submit Fake TTX </button>
-      <button onClick={onRefresh}> Fetch </button>
+      <div style={{
+        display: "flex",
+        flex: "1",
+        borderRadius: "24px",
+        flexDirection: "column",
+        padding: "1em",
+        background: "linear-gradient(90deg, rgba(112,217,99,1) 0%, rgba(127,190,236,1) 37%, rgba(185,243,255,1) 100%)",
+        textAlign: "center", 
+        alignItems: "center"
+      }}>
+        <img style={{width: "10em"}}src ={ibis} />
+        <h1> IBIS VISUALISER</h1>
+        <div></div>
+        <Button
+        sx={{marginBottom: "2em", width: "85%"}}
+        variant="contained"
+        onClick={onSubmit}
+        >
+            Submit Fake TTX
+        </Button>
 
-      <h1> TxRecords ({records.length})</h1>
-      {Records(records)}
+        <Button
+        sx={{marginBottom: "2em", width: "85%"}}
+        variant="contained"
+        onClick={onRefresh}
+        >
+          Fetch
+        </Button>
 
-      <h1> Tagged Transactions </h1>
-      {ChordContainer(matrix, nodeMap)}
+        <div>
+          <span style={{color: "white"}}>There are ({records.length}) TTxRecords</span>
+          {Records(records)}
+        </div>
 
+
+      </div>
+
+      <div style={{
+      display:"flex",
+      flex: "3",
+      padding: "1em",
+      alignItems: "center",
+      justifyContent: "center"
+      }}>
+        {ChordContainer(matrix, nodeMap)}
+      </div>
     </div>
   );
 }

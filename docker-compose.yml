@@ -41,7 +41,7 @@ services:
       pub-eth-net:
 
   visualiser:
-    container_name: cont_visualiser
+    container_name: visualiser
     build: visualiser
     links:
     - mongodb
