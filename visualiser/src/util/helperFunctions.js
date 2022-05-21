@@ -58,8 +58,10 @@ function delEdge(matrix, i, j) {
 
 
 /* TTx Processing */
-export function processTTxMatrix(matrix, biMap, ttx_records) {
-  for (let record of ttx_records) {
+export function processTTxMatrix(biMap, records) {
+  let matrix = createMatrix(biMap.size)
+
+  for (let record of records) { 
     let i = biMap.get(record.target_addr)
     for (let receipt of record.receipts) {
       let j = biMap.get(receipt.returner_addr)
@@ -67,6 +69,7 @@ export function processTTxMatrix(matrix, biMap, ttx_records) {
       matrix = addEdge(matrix, i, j)
     }
   }
+
   return matrix;
 }
 

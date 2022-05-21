@@ -367,11 +367,11 @@ async function ibis_loop() {
   console.log(chalk.bgMagenta(`launching ibis client...`));
 
   console.log(chalk.magentaBright(`(ibis) `) + chalk.cyan(`waiting for at least 3 peers...`))
-  // while(true) {
-  //   let result = await waitForPeers();
-  //   if(!result) continue;
-  //   else break;
-  // }
+  while(true) {
+    let result = await waitForPeers();
+    if(!result) continue;
+    else break;
+  }
 
   IBIS.main()
 

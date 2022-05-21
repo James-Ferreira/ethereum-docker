@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import ChordContainer from "./containers/ChordContainer";
 import { addNewRecord, fetchRecords, printBiMap, createNodeMap, createMatrix, processTTxMatrix } from "./util/helperFunctions";
 import Records from "./components/Records";
@@ -12,55 +12,63 @@ function App() {
   const [matrix, setMatrix] = useState([])
   const [nodeMap, setNodeMap] = useState(new BiMap())
 
-  async function onRefresh() {
-    let fetchedRecords = await fetchRecords();
-    setRecords(fetchedRecords);
-    console.log("refreshed " + fetchedRecords.length + " records...")
-    //nodeIndexMap = updateNodeMap(nodeIndexMap, fetchedRecords);
-    let bi_map = createNodeMap(records)
 
-    let node_matrix = createMatrix(bi_map.size);
-    node_matrix = processTTxMatrix(node_matrix, bi_map, records)
-    console.log(node_matrix)
-    setNodeMap(bi_map)
-    setMatrix(node_matrix)
+  async function refreshRecords() {
+    let newRecords = await fetchRecords();
+    setRecords(newRecords)
+  }
+
+
+  async function refreshDiagram() {
+    // create a bidirectional map of the records->index
+    let map = createNodeMap(records)
+    setNodeMap(map);
+
+    //process the matrix to have node edges
+    console.log("processing matrix with records:" + records)
+    let mat = processTTxMatrix(map, records)
+    setMatrix(mat)
   }
 
   function onSubmit(e) {
     console.log("submitting test TTx")
     addNewRecord()
-    onRefresh()
+    refreshDiagram()
   }
 
-  /*
-    Computes the chord layout for the specified square matrix of size n×n, 
-    where the matrix represents the directed flow amongst a network (a complete digraph)
-    of n nodes.
-    
-    The given matrix must be an array of length n, where each element matrix[i] is an
-    array of n numbers, where each matrix[i][j] represents the flow from the ith node
-    in the network to the jth node. 
-    
-    Each number matrix[i][j] must be nonnegative, though it can be zero if there is no
-    flow from node i to node j. 
-  */
-  // const matrix = [
-  //   [0, 1, 1, 0], //A black
-  //   [1, 0, 1, 1], //B yellow
-  //   [1, 1, 0, 0], //C brown
-  //   [1, 0, 0, 0], //D orange
-  // ]; 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log('Automatically refreshing MongoDB Records...');
+      const updateAll = async () => {
+        let newRecords = await fetchRecords();
+          // create a bidirectional map of the records->index
+        let map = createNodeMap(newRecords)
 
+        //process the matrix to have node edges
+        let mat = processTTxMatrix(map, newRecords)
+        setRecords(newRecords)
+        setNodeMap(map);
+        setMatrix(mat)
+      }
 
+      updateAll();
+
+    }, 2000);
+  
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div style={{
       display: "flex",
-      alignItems: "center"
+      alignItems: "center",
+      marginLeft: "1em",
+      height: "100vh"
     }}>
       <div style={{
         display: "flex",
         flex: "1",
+        height: 800,
         borderRadius: "24px",
         flexDirection: "column",
         padding: "1em",
@@ -82,14 +90,16 @@ function App() {
         <Button
         sx={{marginBottom: "2em", width: "85%"}}
         variant="contained"
-        onClick={onRefresh}
+        onClick={refreshDiagram}
         >
-          Fetch
+          Update
         </Button>
 
-        <div>
-          <span style={{color: "white"}}>There are ({records.length}) TTxRecords</span>
-          {Records(records)}
+        <div style={{display: "flex", flexDirection: "column", textAlign: "left"}}>
+          <span style={{color: "white"}}># TTxRecords: {records.length} </span>
+          <span style={{color: "white"}}># Distinct Nodes: {nodeMap.size} </span>
+          <span style={{color: "white"}}># Matrix Size: {matrix.length} </span>
+          {/* {Records(records)} */}
         </div>
 
 
@@ -100,7 +110,10 @@ function App() {
       flex: "3",
       padding: "1em",
       alignItems: "center",
-      justifyContent: "center"
+      justifyContent: "center",
+      background: "#30303030",
+      borderRadius: "16px",
+      marginLeft: "1em"
       }}>
         {ChordContainer(matrix, nodeMap)}
       </div>

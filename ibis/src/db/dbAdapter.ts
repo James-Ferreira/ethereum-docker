@@ -49,12 +49,13 @@ export default class DatabaseAdapter {
         //let record: TTxRecordInterface = await TTxRecordModel.find({ttx_hash: tx_hash})
         //push the new TTxReceipt into the ttx record
         //record.save()
-        console.log(`adding a TTx receipt to  ${TTxRecordModel.find({ttx_hash: ttx_hash})}`)
+        console.log(`adding a TTx receipt for TTx Hash: ${ttx_hash}`)
         let doc = await TTxRecordModel.findOneAndUpdate(
             {ttx_hash: ttx_hash},
             {$addToSet: {receipts: receipt}}
         )
-        if(doc) console.log(`updated receipts  ${doc.receipts}`)
+
+        //if(doc) console.log(`updated receipts  ${doc.receipts}`)
 
     }
 
